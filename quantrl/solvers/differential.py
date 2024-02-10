@@ -6,7 +6,7 @@
 __name__    = 'quantrl.solvers.differential'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-01-15"
+__updated__ = "2024-01-16"
 
 # dependencies
 from scipy.interpolate import splev, splrep
@@ -14,17 +14,19 @@ from tqdm import tqdm
 import numpy as np
 import scipy.integrate as si
 
-class IVPSolver(object):
+# TODO: Implement TorchDiffEqSolver
+
+class SciPyIVPSolver(object):
     """ODE and DDE solver using SciPy-based methods for initial-value problems.
 
     Currently, the module only supports a single delay interval.
     
     Parameters
     ----------
-    func : callable
-        ODE function in the format ``func(t, y, args)``.
+    func: callable
+        ODE/DDE function in the format ``func(t, y, args)``.
         The first element of ``args`` contains the delay function, the second element contains the function for the controls and the third contains the constant parameters.
-    solver_params : dict
+    solver_params: dict
         Parameters of the solver.
         Currently supported options are:
             ========        ====================================================
@@ -39,14 +41,14 @@ class IVPSolver(object):
             'ode_is_stiff'  (*bool*) option to select whether the integration is a stiff problem or a non-stiff one. Default is ``False``.
             'ode_step_dim'  (*bool*) number of steps to jump during integration. Higher values give faster results. Default is ``10``.
             ========        ====================================================
-    func_controls : callable, default=None
+    func_controls: callable, default=None
         Function for the controls in the format ``func_controls(t)``.
-    has_delay : bool, default=True
+    has_delay: bool, default=True
         Option to solve DDEs.
-    func_delay : callable, default=None
+    func_delay: callable, default=None
         History function for first delay step in the format ``func_delay(t)``.
         This function is then internally replaced by the interpolated function for the subsequent steps.
-    t_delay : float, default=0.0
+    t_delay: float, default=0.0
         Exact value of delay time.
 
     ..note: In the presence of delay, the parameter ``'ode_step_dim'`` is overriden by the delay interval.
@@ -54,11 +56,10 @@ class IVPSolver(object):
 
     # attributes
     scipy_new_methods = ['BDF', 'DOP853', 'LSODA', 'Radau', 'RK23', 'RK45']
-    """list : New Python-based methods availabile in :class:`scipy.integrate`."""
-    """dict : New SciPy ODE solver methods."""
+    """list: New Python-based methods availabile in :class:`scipy.integrate`."""
     scipy_old_methods = ['dop853', 'dopri5', 'lsoda', 'vode', 'zvode']
-    """list : Old FORTRAN-based methods availabile in :class:`scipy.integrate`."""
-    """dict : Old SciPy ODE solver methods."""
+    """list: Old FORTRAN-based methods availabile in :class:`scipy.integrate`."""
+
     default_solver_params = {
         't_min': 0.0,
         't_max': 1000.0,
@@ -69,7 +70,7 @@ class IVPSolver(object):
         'ode_is_stiff':False,
         'ode_step_dim': 10
     }
-    """dict : Default parameters of the solver."""
+    """dict: Default parameters of the solver."""
     
     def __init__(self,
         func,
@@ -79,7 +80,7 @@ class IVPSolver(object):
         func_delay=None,
         t_delay:float=0.0
     ):
-        """Class constructor for IVPSolver."""
+        """Class constructor for SciPyIVPSolver."""
 
         # set functions
         self.func = func
@@ -121,9 +122,6 @@ class IVPSolver(object):
             self.ode_step_dim = self.solver_params['ode_step_dim']
         # set times
         self.T_eval = np.linspace(self.solver_params['t_min'], self.t_eval_max, self.t_eval_dim, dtype=np.float_)
-
-        # initialize buffer
-        self._Y = None
         
     def step_ivp(self,
         y0,
@@ -136,37 +134,34 @@ class IVPSolver(object):
         ----------
         y0: float
             Initial values of the variables.
-        T_step: :class:numpy.ndarray
+        T_step: :class:`numpy.ndarray`
             Times at which the results are returned.
         params: list
             Parameters to pass to the function.
         
         Returns
         -------
-        Y: :class:numpy.ndarray
+        Y: :class:`numpy.ndarray`
             Values of the variables at the given points of time.
         """
-
-        # interploation buffer
-        if self._Y is None:
-            self._Y = np.empty((np.shape(T_step)[0], np.shape(y0)[0]), dtype=np.float_)
 
         # step arguments
         args = [self.func_delay, self.func_controls, params]
 
         # FORTRAN-based solvers
         if self.solver_params['ode_method'] in self.scipy_old_methods:
-            self._Y[0] = y0
+            _Y = np.empty((len(T_step), len(y0)), dtype=np.float_)
+            _Y[0] = y0
             self.integrator.set_initial_value(
                 y=y0,
                 t=T_step[0]
             )
             self.integrator.set_f_params(args)
             for i in range(1, len(T_step)):
-                self._Y[i] = self.integrator.integrate(T_step[i])
+                _Y[i] = self.integrator.integrate(T_step[i])
         # Python-based methods
         else:
-            self._Y = np.transpose(si.solve_ivp(
+            _Y = np.transpose(si.solve_ivp(
                 fun=self.func,
                 y0=y0,
                 t_span=[T_step[0], T_step[-1]],
@@ -179,10 +174,10 @@ class IVPSolver(object):
 
         # update delay function
         if self.has_delay:
-            b_spline = [splrep(T_step, self._Y[:, j]) for j in range(self._Y.shape[1])]
-            self.func_delay = lambda t: np.array([splev(t, b_spline[j]) for j in range(self._Y.shape[1])])
+            b_spline = [splrep(T_step, _Y[:, j]) for j in range(_Y.shape[1])]
+            self.func_delay = lambda t: np.array([splev(t, b_spline[j]) for j in range(_Y.shape[1])])
 
-        return self._Y[:np.shape(T_step)[0]]
+        return _Y
     
     def solve_ivp(self,
         y0,
@@ -202,18 +197,18 @@ class IVPSolver(object):
         
         Returns
         -------
-        Y: :class:numpy.ndarray
+        Y: :class:`numpy.ndarray`
             Values of the variables at all points of time.
         """
 
         # initialize results
-        Y = np.empty((self.t_eval_dim, np.shape(y0)[0]), dtype=np.float_)
+        Y = np.empty((self.t_eval_dim, len(y0)), dtype=np.float_)
         Y[0] = y0
 
         # evolve
         for i in tqdm(
             range(self.ode_step_dim, self.t_eval_dim, self.ode_step_dim),
-            desc='Progress (time)',
+            desc="Progress (time)",
             leave=False,
             mininterval=0.5,
             disable=not show_progress
