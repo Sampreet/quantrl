@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
- 
+
 """Module for input output operations."""
 
 __name__    = 'quantrl.io'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-12-07"
-__updated__ = "2024-02-10"
+__updated__ = "2024-02-17"
 
 # dependencies
 from tqdm import tqdm
@@ -17,7 +17,7 @@ import os
 
 class FileIO(object):
     """Handler for file input-output.
-    
+
     Initializes ``cache_in_parts``, ``cache`` and ``index``.
     The parent needs to implement the ``close`` method.
 
@@ -52,7 +52,7 @@ class FileIO(object):
         data
     ):
         """Method to update the cache with data.
-        
+
         Parameters
         ----------
         data: numpy.ndarray
@@ -75,7 +75,7 @@ class FileIO(object):
         idx_end:int
     ):
         """Method to dump cache to disk.
-        
+
         Parameters
         ----------
         idx_start: int
@@ -110,7 +110,7 @@ class FileIO(object):
                 idx_start=_idx_s,
                 idx_end=_idx_s + self.max_cache_size - 1
             )
-        
+
         # clean
         del self
 
@@ -120,7 +120,7 @@ class FileIO(object):
         idxs:list=None
     ):
         """Method to return select disk-cached data between a given set of indices.
-        
+
         Parameters
         ----------
         idx_start: int
@@ -137,7 +137,7 @@ class FileIO(object):
                 idx_start=0,
                 idx_end=-1
             )[idx_start:idx_end]
-        
+
         # if cached in parts
         self.cache_list = list()
         for i in tqdm(
@@ -163,7 +163,7 @@ class FileIO(object):
         idx_end:int
     ):
         """Method to load cache from disk.
-        
+
         Parameters
         ----------
         idx_start: int

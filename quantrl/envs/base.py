@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
- 
+
 """Module with base environments for reinforcement learning."""
 
 __name__    = 'quantrl.envs.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-02-10"
+__updated__ = "2024-02-17"
 
 # dependencies
 from tqdm import tqdm
@@ -18,7 +18,6 @@ from ..io import FileIO
 from ..plotters import TrajectoryPlotter
 
 # TODO: Interface ConsoleIO
-# TODO: Implement kwargs
 
 class BaseGymEnv(gymnasium.Env):
     r"""Gymnasium-based base environment for reinforcement-learning.
@@ -38,40 +37,35 @@ class BaseGymEnv(gymnasium.Env):
         Normalized time stepsize.
     t_norm_mul: float
         Multiplier to revert the normalization.
-    action_maxs: list
+    n_observations: tuple
+        Total number of observations.
+    n_actions: tuple
+        Total number of observations.
+    action_maximums: list
         Maximum values of each action.
-    actions_interval: int, optional
-        Interval at which the actions are updated. Must be positive. Default is ``1``.
-    reward_max: float, optional
-        Maximum value of reward (implemented in children). Default is ``1.0``.
-    reward_noise: float, optional
-        Noise in the reward function (implemented in children). Default is ``0.0``.
-    action_space_range: list, optional
-        Range of the actions obtained from the network. The output is scaled by the corresponding action multiplier. Default is ``[-1, 1]``.
-    observation_space_range: list, optional
-        Range of the observations. Default is ``[-1e6, 1e6]``.
-    observation_space_shape: tuple, optional
-        Shape of the observations. Default is ``(10, )``.
-    save_properties: bool, optional
-        Option to save additional properties for each time step. Requires ``get_properties()`` method implemented in children.
-    plot: bool, optional
-        Option to plot the trajectories using ``:class:BaseTrajectoryPlotter``. Default is ``True``.
-    plot_interval: int, optional
-        Number of trajectories after which the plots are updated. Must be non-negative. If ``0``, the plots are plotted after each step.
-    plot_idxs: list, optional
-        Indices of the data values required to plot at each time step. Default is ``[-1]`` for the cummulative reward.
-    axes_args: list, optional
-        Lists of axis properties. The first element of each is the ``x_label``, the second is ``y_label``, the third is ``[y_limit_min, y_limit_max]`` and the fourth is ``y_scale``. Default is ``[['$t / t_{0}$', '$\\tilde{R}$', [np.sqrt(10) * 1e-1, np.sqrt(10) * 1e6], 'log']]``.
-    axes_lines_max: int, optional
-        Maximum number of lines to display in each plot. Higher numbers slow down the run. Default is ``100``.
-    axes_cols: int, optional
-        Number of columns in the figure. Default is ``3``.
-    dir_prefix: str, optional
-        Prefix of the directory where the data will be stored. Default is ``'data'``.
-    max_trajectories_per_file: int, optional
-        Maximum number of trajectory data to save per file. Default is ``100``.
-
-    .. note:: ``observation_space_shape`` and ``solver_type`` may be different for different systems.
+    action_interval: int
+        Interval at which the actions are updated. Must be positive.
+    dir_prefix: str, default='data'
+        Prefix of the directory where the data will be stored.
+    kwargs: dict, optional
+        Keyword arguments. Available options are:
+        ============================    ================================================
+        key                             value
+        ============================    ================================================
+        has_delay                       (*bool*) option to implement delay functions. Default is ``False``.
+        observation_space_range         (*list*) range of the observations. Default is ``[-1e9, 1e9]``.
+        action_space_range              (*list*) range of the actions obtained from the network. The output is scaled by the corresponding action multiplier. Default is ``[-1.0, 1.0]``.
+        action_space_type               (*str*) the type of action space. Options are ``"Binary"`` and ``"Box"``. Default is ``"Box"``.
+        reward_max                      (*float*) maximum value of reward (implemented in children). Default is ``1.0``.
+        reward_noise                    (*float*) noise in the reward function (implemented in children). Default is ``0.0``.
+        plot                            (*bool*) option to plot the trajectories using ``:class:BaseTrajectoryPlotter``. Default is ``True``.
+        plot_interval                   (*int*) number of trajectories after which the plots are updated. Must be non-negative. If ``0``, the plots are plotted after each step.
+        plot_idxs                       (*list*) indices of the data values required to plot at each time step. Default is ``[-1]`` for the cummulative reward.
+        axes_args                       (*list*) lists of axis properties. The first element of each is the ``x_label``, the second is ``y_label``, the third is ``[y_limit_min, y_limit_max]`` and the fourth is ``y_scale``. Default is ``[['$t / t_{0}$', '$\\tilde{R}$', [np.sqrt(10) * 1e-1, np.sqrt(10) * 1e6], 'log']]``.
+        axes_lines_max                  (*int*) maximum number of lines to display in each plot. Higher numbers slow down the run. Default is ``100``.
+        axes_cols                       (*int*) number of columns in the figure. Default is ``2``.
+        max_trajectories_per_file       (*int*) maximum number of trajectory data to save per file. Default is ``100``.
+        ============================    ================================================
 
     Notes
     -----
@@ -79,50 +73,60 @@ class BaseGymEnv(gymnasium.Env):
             ====================    ================================================
             method                  returns
             ====================    ================================================
-            _step                   the updated observations with shape ``(action_interval + 1, n_observations)``, formatted as ``_step(actions)``, where ``actions`` is the array of actions with shape ``(n_actions, )`` multiplied by ``action_maxs``.
+            _step                   the updated observations with shape ``(action_interval + 1, n_observations)``, formatted as ``_step(actions)``, where ``actions`` is the array of actions with shape ``(n_actions, )`` multiplied by ``action_maximums``.
             get_Properties          the properties calculated from ``Observations`` with shape ``(action_interval + 1, n_properties)``.
             get_Reward              the reward calculated using the observations or the properties with shape ``(action_interval, )``. The class attributes ``reward_max`` and ``reward_noise`` can be utilized here.
             reset_Observations      ``None``. This method is used to reset the first entry (index ``0``) of the ``Observations`` variable which has shape ``(action_interval + 1, n_observations)`` with the initial values of the observations.
             ====================    ================================================
     """
 
-    axis_args_learning_curve = ['Episodes $N$', 'Cummulative Reward $\\tilde{R}$', [np.sqrt(10) * 1e-1, np.sqrt(10) * 1e6], 'log']
-    """list: Axis arguments to plot the learning curve."""
+    default_axis_args_learning_curve=['Episodes $N$', 'Cummulative Reward $\\tilde{R}$', [np.sqrt(10) * 1e-5, np.sqrt(10) * 1e4], 'log']
+    """list: Default axis arguments to plot the learning curve."""
+
+    default_kwargs = dict(
+        has_delay=False,
+        observation_space_range=[-1e9, 1e9],
+        action_space_range=[-1.0, 1.0],
+        action_space_type="Box",
+        reward_max=1.0,
+        reward_noise=0.0,
+        plot=True,
+        plot_interval=10,
+        plot_idxs=[-1],
+        axes_args=[
+            ['$t / \\tau$', '$\\tilde{R}$', [np.sqrt(10) * 1e-5, np.sqrt(10) * 1e4], 'log']
+        ],
+        axes_lines_max=10,
+        axes_cols=2,
+        max_trajectories_per_file=100
+    )
+    """dict: Default values of all keyword arguments."""
 
     def __init__(self,
         n_trajectories:int,
         t_norm_max:float,
         t_norm_ssz:float,
         t_norm_mul:float,
-        action_maxs:list,
-        action_interval:int=1,
-        has_delay:bool=False,
-        reward_max:float=0.1,
-        reward_noise:float=0.0,
-        action_space_range:list=[-1, 1],
-        observation_space_range:list=[-1e6, 1e6],
-        observation_space_shape:tuple=(10, ),
-        save_properties:bool=False,
-        plot:bool=True,
-        plot_interval:int=1,
-        plot_idxs:list=[-1],
-        axes_args:list=[
-            ['$t / t_{0}$', '$\\tilde{R}$', [np.sqrt(10) * 1e-1, np.sqrt(10) * 1e6], 'log']
-        ],
-        axes_lines_max:int=100,
-        axes_cols:int=3,
-        dir_prefix:str='data',
-        max_trajectories_per_file:int=100
+        n_observations:int,
+        n_actions:int,
+        action_maximums:list,
+        action_interval:int,
+        dir_prefix='data',
+        **kwargs
     ):
         """Class constructor for BaseGymEnv."""
+
+        # update keyword arguments
+        for key in self.default_kwargs:
+            kwargs[key] = kwargs.get(key, self.default_kwargs[key])
 
         # validate
         assert t_norm_max > t_norm_ssz, 'maximum normalized time should be greater than the normalized step size'
         assert action_interval > 0, 'parameter ``action_interval`` should be a positive integer'
-        assert plot_interval >= 0, 'parameter ``plot_interval`` should be a non-negative integer'
-        assert plot_interval < n_trajectories if plot else True, 'parameter ``plot_interval`` should be a less than parameter ``n_trajectories``'
-        assert len(plot_idxs) == len(axes_args), 'number of indices for plot should match number of axes arguments'
-        
+        assert kwargs['plot_interval'] >= 0, 'parameter ``plot_interval`` should be a non-negative integer'
+        assert kwargs['plot_interval'] < n_trajectories if kwargs['plot'] else True, 'parameter ``plot_interval`` should be a less than parameter ``n_trajectories``'
+        assert len(kwargs['plot_idxs']) == len(kwargs['axes_args']), 'number of indices for plot should match number of axes arguments'
+
         # trajectory constants
         self.n_trajectories = n_trajectories
         # time constants
@@ -134,63 +138,72 @@ class BaseGymEnv(gymnasium.Env):
         self.T_norm = np.arange(self.t_dim, dtype=np.float_) * self.t_norm_ssz
         self.T = self.T_norm * t_norm_mul
         # step constants
-        self.action_maxs = np.array(action_maxs, dtype=np.float_)
+        self.n_observations = n_observations
+        self.n_actions = n_actions
+        self.action_maximums = np.array(action_maximums, dtype=np.float_)
         self.action_interval = action_interval
+        # align delay with action interval
+        self.has_delay = kwargs['has_delay']
+        self.t_delay = self.T[self.action_interval] - self.T[0]
         # extend one step if not divisible
         _action_dim = (self.t_dim - 1) / self.action_interval
         self.total_timesteps = self.n_trajectories * (int(_action_dim + 1) if _action_dim - int(_action_dim) > 0 else int(_action_dim))
-        # align delay with action interval
-        self.has_delay = has_delay
-        self.t_delay = self.T[self.action_interval] - self.T[0]
         # reward constants
-        self.reward_max = np.float_(reward_max)
-        self.reward_noise = np.float_(reward_noise)
+        self.reward_max = np.float_(kwargs['reward_max'])
+        self.reward_noise = np.float_(kwargs['reward_noise'])
         # data constants
-        self.observation_space_range = observation_space_range
-        self.save_properties = save_properties
+        self.has_properties = False
         self.file_prefix = dir_prefix + '_' + '_'.join([
-            str(n_trajectories),
-            str(t_norm_max),
-            str(t_norm_ssz),
-            str(action_maxs),
-            str(action_interval),
-            str(reward_max),
-            str(reward_noise)]
+            str(self.n_trajectories),
+            str(self.t_norm_max),
+            str(self.t_norm_ssz),
+            str(self.t_norm_mul),
+            str(self.action_maximums),
+            str(self.action_interval)]
         ) + '/env'
         # plot constants
-        self.plot = plot
-        self.plot_interval = plot_interval
-        self.plot_idxs = plot_idxs
-        
-        # initialize environment
+        self.plot = kwargs['plot']
+        self.plot_interval = kwargs['plot_interval']
+        self.plot_idxs = kwargs['plot_idxs']
+
+        # initialize Gymnasium environment
         super().__init__()
-        self.action_space = gymnasium.spaces.Box(
-            low=action_space_range[0],
-            high=action_space_range[1],
-            shape=self.action_maxs.shape,
-            dtype=np.float_
-        )
+        # discrete actions
+        if "Binary" in kwargs['action_space_type']:
+            self.action_space_range = [0, 1]
+            self.action_space = gymnasium.spaces.MultiDiscrete(
+                nvec=[2] * self.n_actions,
+            )
+        # continuous actions
+        else:
+            self.action_space_range = kwargs['action_space_range']
+            self.action_space = gymnasium.spaces.Box(
+                low=self.action_space_range[0],
+                high=self.action_space_range[1],
+                shape=(self.n_actions, ),
+                dtype=np.float_
+            )
+        # continuous observations
+        self.observation_space_range = kwargs['observation_space_range']
         self.observation_space = gymnasium.spaces.Box(
-            low=observation_space_range[0],
-            high=observation_space_range[1],
-            shape=observation_space_shape,
+            low=self.observation_space_range[0],
+            high=self.observation_space_range[1],
+            shape=(self.n_observations, ),
             dtype=np.float_
         )
-        self.n_actions = self.action_space.shape[0]
-        self.n_observations = self.observation_space.shape[0]
 
         # initialize IO
         self.io = FileIO(
             disk_cache_dir=self.file_prefix + '_cache',
-            max_cache_size=max_trajectories_per_file
+            max_cache_size=kwargs['max_trajectories_per_file']
         )
 
         # initialize plotter
         if self.plot:
             self.plotter = TrajectoryPlotter(
-                axes_args=axes_args,
-                axes_lines_max=axes_lines_max,
-                axes_cols=axes_cols,
+                axes_args=kwargs['axes_args'],
+                axes_lines_max=kwargs['axes_lines_max'],
+                axes_cols=kwargs['axes_cols'],
                 show_title=True
             )
 
@@ -200,17 +213,18 @@ class BaseGymEnv(gymnasium.Env):
         self.Observations = np.zeros((self.action_interval + 1, self.n_observations), dtype=np.float_)
         self.Rs = np.zeros((self.n_trajectories, 1), dtype=np.float_)
 
-        # validate environment
+        # validate child environment
         try:
             self.reset_Observations()
             self.Observations[1:] = self.Observations[0]
             self.n_data_elements = self.n_actions + self.n_observations + 2
-            if self.save_properties:
+            if getattr(self, 'get_Properties', None) is not None:
                 n_properties = np.shape(self.get_Properties())[1]
                 self.n_data_elements += n_properties
+                self.has_properties = True
             self.R = self.get_Reward()[-1]
         except AttributeError as error:
-            print(f"Missing required method ({error}). Refer to **Notes** of ``:class:quantrl.envs.base.BaseGymEnv`` for its implementation.")
+            print(f"Missing required method or attribute: ({error}). Refer to **Notes** of :class:`quantrl.envs.base.BaseGymEnv` for the implementation format of the missing method or add the missing attribute to the ``reset_Observations`` method.")
             exit()
 
     def reset(self,
@@ -229,7 +243,7 @@ class BaseGymEnv(gymnasium.Env):
         Returns
         -------
         observations: :class:`numpy.ndarray`
-            Inititial array of observations.
+            Inititial observations.
         info: str
             Information on the reset.
         """
@@ -255,7 +269,7 @@ class BaseGymEnv(gymnasium.Env):
             )
 
         return self.Observations[0], None
-    
+
     def render(self):
         """Method to render one step."""
 
@@ -269,12 +283,12 @@ class BaseGymEnv(gymnasium.Env):
         Parameters
         ----------
         actions: :class:`numpy.ndarray`
-            Array of actions at current time.
-        
+            Actions at current time.
+
         Returns
         -------
         observations: :class:`numpy.ndarray`
-            Array of observations at current time.
+            Observations at current time.
         reward: float
             Reward calculated for the action interval.
         terminated: bool
@@ -286,7 +300,7 @@ class BaseGymEnv(gymnasium.Env):
         """
 
         # update actions
-        self.actions[:] = actions * self.action_maxs
+        self.actions = actions * self.action_maximums
         # store previous reward
         prev_reward = self.R
 
@@ -320,7 +334,7 @@ class BaseGymEnv(gymnasium.Env):
             self.Rs[self.traj_idx, 0] = self.R
 
         return self.Observations[self.T_step.shape[0] - 1], np.float_(self.R - prev_reward), terminated, truncated, {}
-    
+
     def _update(self):
         """Method to update the trajectory data for the step.
 
@@ -341,7 +355,7 @@ class BaseGymEnv(gymnasium.Env):
         # update observations
         self.data[_idxs, 1 + self.n_actions:1 + self.n_actions + self.n_observations] = self.Observations
         # update properties
-        if self.save_properties:
+        if self.has_properties:
             self.data[_idxs, 1 + self.n_actions + self.n_observations:-1] = np.array(self.get_Properties())
         # update reward
         self.data[_idxs, -1] = self.R + self.get_Reward()[-1]
@@ -357,7 +371,7 @@ class BaseGymEnv(gymnasium.Env):
         """Method to freely evolve the trajectory."""
 
         # update actions
-        self.actions = self.action_maxs
+        self.actions = self.action_maximums
 
         # evolve
         for _ in tqdm(
@@ -376,7 +390,7 @@ class BaseGymEnv(gymnasium.Env):
             self._update()
 
         # plot
-        if self.plot and not self.plot_interval:
+        if self.plot and self.plot_interval:
             self.plotter.plot_lines(
                 xs=self.T_norm,
                 Y=self.data[:, self.plot_idxs]
@@ -403,7 +417,7 @@ class BaseGymEnv(gymnasium.Env):
         # save learning curve
         self.plot_learning_curve(
             reward_data=self.Rs,
-            axis_args=self.axis_args_learning_curve,
+            axis_args=self.default_axis_args_learning_curve,
             save_plot=True,
             hold=False,
         )
@@ -511,14 +525,14 @@ class BaseGymEnv(gymnasium.Env):
 
         # new plotter
         plotter = TrajectoryPlotter(
-            axes_args=[axis_args if axis_args is not None and len(axis_args) == 4 else self.axis_args_learning_curve],
+            axes_args=[axis_args if axis_args is not None and len(axis_args) == 4 else self.default_axis_args_learning_curve],
             axes_lines_max=1,
             axes_cols=1,
             show_title=False
         )
         # plot lines
         plotter.plot_lines(
-            xs=list(range(len(reward_data))),
+            xs=list(range(reward_data.shape[0])),
             Y=reward_data
         )
         # save plot

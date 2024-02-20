@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
- 
+
 """Module with plotters."""
 
 __name__    = 'quantrl.plotters'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-12-08"
-__updated__ = "2024-02-10"
+__updated__ = "2024-02-17"
 
 # dependencies
 from io import BytesIO
@@ -79,8 +79,10 @@ class TrajectoryPlotter(object):
                 ax_args = self.axes_args[i * self.axes_cols + j]
                 # y-axis label, limits and scale
                 ax.set_xlabel(ax_args[0])
+                ax.xaxis.set_ticks_position('both')
                 ax.set_ylabel(ax_args[1])
                 ax.set_ylim(ymin=ax_args[2][0], ymax=ax_args[2][1])
+                ax.yaxis.set_ticks_position('both')
                 ax.set_yscale(ax_args[3])
                 self.axes.append(ax)
         if self.show_title:
@@ -97,7 +99,7 @@ class TrajectoryPlotter(object):
         update_buffer=False
     ):
         """Method to plot new lines.
-        
+
         Parameters
         ----------
         xs: list
@@ -138,7 +140,7 @@ class TrajectoryPlotter(object):
         j=0
     ):
         """Method to update lines.
-        
+
         Parameters
         ----------
         y_js: list
@@ -159,7 +161,7 @@ class TrajectoryPlotter(object):
         file_name:str
     ):
         """Method to create a gif file from the frame buffer.
-        
+
         Parameters
         ----------
         file_name: str
@@ -182,7 +184,7 @@ class TrajectoryPlotter(object):
         file_name:str
     ):
         """Method to save the plot.
-        
+
         Parameters
         ----------
         file_name: str

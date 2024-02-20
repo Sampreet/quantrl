@@ -1,5 +1,16 @@
 # Changelog
 
+## 2024/02/20 - 00 - v0.0.4 - Implemented kwargs
+* Updated `quantrl.envs.base.BaseGymEnv` class:
+    * Implemented keyword arguments in initialization.
+    * Properties are saved if the child method exists.
+* Minor fixes to `quantrl.envs.deterministic.LinearizedHOEnv` class.
+* Updated Wiener process for drift matrix in `quantrl.envs.stochastic.LinearEnv` class.
+* Reversed the sequence of arguments in `quantrl.solvers.differential.SciPyIVPSolver` class.
+* Update tick options in `quantrl.plotter` module.
+* Updated `README` and `setup`.
+
+
 ## 2024/02/10 - 00 - v0.0.3 - Added Wiener Processes
 * Restructured `quantrl.envs.rl` module:
     * Created `quantrl.envs.base` module with `BaseGymEnv`.

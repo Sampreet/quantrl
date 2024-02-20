@@ -5,7 +5,7 @@ with open('README.md', 'r') as file_readme:
 
 setup(
     name='quantrl',
-    version='0.0.3',
+    version='0.0.4',
     author='Sampreet Kalita',
     author_email='sampreet.kalita@hotmail.com',
     desctiption='The Quantum Toolbox for Reinforcement Learning',

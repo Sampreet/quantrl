@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
- 
+
 """Module to solve differential equations."""
 
 __name__    = 'quantrl.solvers.differential'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-01-16"
+__updated__ = "2024-02-17"
 
 # dependencies
 from scipy.interpolate import splev, splrep
@@ -14,18 +14,18 @@ from tqdm import tqdm
 import numpy as np
 import scipy.integrate as si
 
-# TODO: Implement TorchDiffEqSolver
+# TODO: Implement TorchIVPSolver
 
 class SciPyIVPSolver(object):
     """ODE and DDE solver using SciPy-based methods for initial-value problems.
 
     Currently, the module only supports a single delay interval.
-    
+
     Parameters
     ----------
     func: callable
         ODE/DDE function in the format ``func(t, y, args)``.
-        The first element of ``args`` contains the delay function, the second element contains the function for the controls and the third contains the constant parameters.
+        The first element of ``args`` contains the constant parameters, the second element contains the function for the controls and the third contains the delay function.
     solver_params: dict
         Parameters of the solver.
         Currently supported options are:
@@ -71,7 +71,7 @@ class SciPyIVPSolver(object):
         'ode_step_dim': 10
     }
     """dict: Default parameters of the solver."""
-    
+
     def __init__(self,
         func,
         solver_params:dict,
@@ -122,7 +122,7 @@ class SciPyIVPSolver(object):
             self.ode_step_dim = self.solver_params['ode_step_dim']
         # set times
         self.T_eval = np.linspace(self.solver_params['t_min'], self.t_eval_max, self.t_eval_dim, dtype=np.float_)
-        
+
     def step_ivp(self,
         y0,
         T_step,
@@ -138,7 +138,7 @@ class SciPyIVPSolver(object):
             Times at which the results are returned.
         params: list
             Parameters to pass to the function.
-        
+
         Returns
         -------
         Y: :class:`numpy.ndarray`
@@ -146,7 +146,7 @@ class SciPyIVPSolver(object):
         """
 
         # step arguments
-        args = [self.func_delay, self.func_controls, params]
+        args = [params, self.func_controls, self.func_delay]
 
         # FORTRAN-based solvers
         if self.solver_params['ode_method'] in self.scipy_old_methods:
@@ -178,14 +178,14 @@ class SciPyIVPSolver(object):
             self.func_delay = lambda t: np.array([splev(t, b_spline[j]) for j in range(_Y.shape[1])])
 
         return _Y
-    
+
     def solve_ivp(self,
         y0,
         params=None,
         show_progress=False
     ):
         """Module to take one step.
-        
+
         Parameters
         ----------
         y0: float
@@ -194,7 +194,7 @@ class SciPyIVPSolver(object):
             Parameters to pass to the function.
         show_progress: bool
             Option to show the progress.
-        
+
         Returns
         -------
         Y: :class:`numpy.ndarray`
