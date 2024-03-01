@@ -2,3 +2,5 @@ gymnasium
 matplotlib
 numpy
 scipy
+stable-baselines3
+tqdm

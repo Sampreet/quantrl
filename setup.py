@@ -5,7 +5,7 @@ with open('README.md', 'r') as file_readme:
 
 setup(
     name='quantrl',
-    version='0.0.4',
+    version='0.0.5',
     author='Sampreet Kalita',
     author_email='sampreet.kalita@hotmail.com',
     desctiption='The Quantum Toolbox for Reinforcement Learning',
@@ -28,6 +28,7 @@ setup(
         'matplotlib',
         'numpy',
         'scipy',
+        'stable-baselines3'
     ],
     python_requires='>=3.8',
     zip_safe=False,

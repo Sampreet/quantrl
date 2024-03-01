@@ -6,7 +6,7 @@
 __name__    = 'quantrl.plotters'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-12-08"
-__updated__ = "2024-02-17"
+__updated__ = "2024-02-29"
 
 # dependencies
 from io import BytesIO
@@ -32,21 +32,24 @@ class TrajectoryPlotter(object):
 
     Parameters
     ----------
-    axes_args: list, optional
+    axes_args: list
         Lists of axis properties. The first element of each entry is the ``x_label``, the second is ``y_label``, the third is ``[y_limit_min, y_limit_max]`` and the fourth is ``y_scale``. Default is ``[]``.
-    axes_lines_max: int, optional
-        Maximum number of lines to display in each plot. Higher numbers slow down the run. Default is ``100``.
-    axes_cols: int, optional
-        Number of columns in the figure. Default is ``3``.
-    show_title: bool, optional
-        Option to display the trajectory index as title. Default is ``True``.
+    axes_lines_max: int, default=10
+        Maximum number of lines to display in each plot. Higher numbers slow down the run. Default is ``10``.
+    axes_cols: int, default=2
+        Number of columns in the figure. Default is ``2``.
+    show_title: bool, default=True
+        Option to display the trajectory index as title.
+    save_dir: str, default=None
+        Directory to save the plots on each update. If ``None``, the plots are not saved.
     """
 
     def __init__(self,
-        axes_args:list=[],
-        axes_lines_max:int=100,
-        axes_cols:int=3,
-        show_title:bool=True
+        axes_args:list,
+        axes_lines_max:int=10,
+        axes_cols:int=2,
+        show_title:bool=True,
+        save_dir:str=None
     ):
         """Class constructor for TrajectoryPlotter."""
 
@@ -59,6 +62,14 @@ class TrajectoryPlotter(object):
         self.axes_lines_max = axes_lines_max
         self.axes_cols = axes_cols
         self.show_title = show_title
+        self.save_dir = save_dir
+
+        # create directories if requires saving
+        if self.save_dir is not None:
+            try:
+                os.makedirs(self.save_dir, exist_ok=True)
+            except OSError:
+                pass
 
         # turn on interactive mode
         plt.ion()
@@ -102,14 +113,14 @@ class TrajectoryPlotter(object):
 
         Parameters
         ----------
-        xs: list
+        xs: :class:`numpy.ndarray` or list
             Common X-axis values.
-        Y: list
+        Y: :class:`numpy.ndarray` or list
             Trajectory data points with shape ``(t_dim, n_data)``.
-        traj_idx: int
+        traj_idx: int, default=0
             Index of the current trajectory.
-        update_buffer: bool
-            Option to update the frame buffer
+        update_buffer: bool, default=False
+            Option to update the frame buffer.
         """
 
         # dim existing lines
@@ -135,27 +146,11 @@ class TrajectoryPlotter(object):
             plt.savefig(frame_buffer, format='png')
             self.frames.append(Image.open(frame_buffer))
 
-    def update_lines(self,
-        y_js=[1.0],
-        j=0
-    ):
-        """Method to update lines.
-
-        Parameters
-        ----------
-        y_js: list
-            New values of trajectory data with shape ``(action_interval, n_data)``.
-        j: int
-            Index of the current update.
-        """
-
-        # update existing lines
-        for i in range(len(self.lines)):
-            ys = self.lines[i].get_ydata()
-            ys[j - len(y_js) + 1:j + 1] = y_js
-            self.lines[i].set_ydata(ys)
-        self.fig.canvas.draw()
-        self.fig.canvas.flush_events()
+        # save plot
+        if self.save_dir is not None:
+            self.save_plot(
+                file_name=self.save_dir + '/traj_' + str(traj_idx)
+            )
 
     def make_gif(self,
         file_name:str

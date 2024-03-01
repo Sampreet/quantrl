@@ -1,5 +1,32 @@
 # Changelog
 
+## 2024/03/01 - 00 - v0.0.5 - Vectorized Environments
+* Updated `quantrl.envs.base` module:
+    * ``reset_Observations``, ``get_Properties`` and ``get_Reward`` methods of all classes are renamed to ``reset_observations``, ``get_properties`` and ``get_reward``, with ``reset_observations`` returning the initial observations.
+    * Removed `n_trajectories` parameter and added `n_properties` parameter in all classes.
+    * Added `file_prefix` parameter and `action_steps` attribute to `BaseEnv` class.
+    * Renamed `file_prefix` attribute to `file_path_prefix` for the complete path.
+    * Updated the workflow of `step` methods of all classes.
+    * `plot_learning_curve` method of `BaseEnv` class takes `n_episodes` parameters for running average.
+    * `replay_trajectories` and `close` methods of `BaseEnv` class require `n_episodes` parameter.
+    * `close` method of `BaseEnv` class takes an additional `save_replay` parameter.
+    * Added `save` parameter to `close` method of `BaseGymEnv` class.
+    * Added `close` parameter to `evolve` method of `BaseGymEnv` class.
+    * Added `BaseSB3Env` class to support Stable-Baselines3 vectorized environments.
+* Updated `quantrl.envs.deterministic` module:
+    * Removed `n_trajectories` and added `n_properties` parameters to `LinearizedHOEnv` class.
+    * Removed `actions` parameter from `LinearizedHOEnv._step` method.
+    * Added `LinearizedHOVecEnv` class to interface vectorized environments.
+* Updated `quantrl.envs.stochastic.LinearEnv` class:
+    * Removed `n_trajectories` and added `n_properties` parameters.
+    * Removed `actions` parameter from `_step` and `_step_wiener` methods.
+* Updated `quantrl.io.FileIO` class:
+    * Added option to initialize with `data_shape` parameter.
+    * Renamed `max_cache_size` parameter to `disk_cache_size`.
+    * Added `dump_cache` parameter in `close` method.
+* Added option to save plots in `save_dir` directory in `quantrl.plotters.TrajectoryPlotter` class.
+* Updated `README`, `requirements` and `setup`.
+
 ## 2024/02/20 - 00 - v0.0.4 - Implemented kwargs
 * Updated `quantrl.envs.base.BaseGymEnv` class:
     * Implemented keyword arguments in initialization.

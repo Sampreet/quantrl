@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.stochastic'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-02-17"
+__updated__ = "2024-03-01"
 
 # dependencies
 import numpy as np
@@ -20,9 +20,11 @@ from .base import BaseGymEnv
 class LinearEnv(BaseGymEnv):
     """Class to interface stochastic linear environments.
 
+    Initializes ``A``.
+
     The interfaced environment requires ``default_params`` dictionary defined before initializing the parent class.
-    The interfaced environment needs to implement ``reset_Observations``, ``get_Properties`` and ``get_Reward`` methods.
-    Refer to **Notes** of :class:`quantrl.envs.base.BaseGymEnv` for their implementations.
+    The interfaced environment needs to implement ``reset_observations``, ``get_properties`` and ``get_reward`` methods.
+    Refer to **Notes** of :class:`quantrl.envs.base.BaseEnv` for their implementations.
     The ``_step_wiener`` method requires ``get_M`` for the evolution matrices and the ``get_noise`` for the noise values.
     Refer to **Notes** below for their implementations.
 
@@ -34,16 +36,16 @@ class LinearEnv(BaseGymEnv):
         Description of the environment.
     params: dict
         Parameters of the environment.
-    n_trajectories: int
-        Total number of trajectories.
     t_norm_max: float
-        Maximum time for each trajectory in normalized units.
+        Maximum time for each episode in normalized units.
     t_norm_ssz: float
         Normalized time stepsize.
     t_norm_mul: float
         Multiplier to revert the normalization.
     n_observations: tuple
         Total number of observations.
+    n_properties: int
+        Total number of properties.
     n_actions: tuple
         Total number of observations.
     action_maximums: list
@@ -55,7 +57,7 @@ class LinearEnv(BaseGymEnv):
     dir_prefix: str, default='data'
         Prefix of the directory where the data will be stored.
     kwargs: dict, optional
-        Keyword arguments. Refer to the ``kwargs`` parameter of :class:`quantrl.envs.base.BaseGymEnv` for available options. Additional options are:
+        Keyword arguments. Refer to the ``kwargs`` parameter of :class:`quantrl.envs.base.BaseEnv` for available options. Additional options are:
         ============    ================================================
         key             value
         ============    ================================================
@@ -89,11 +91,11 @@ class LinearEnv(BaseGymEnv):
         name:str,
         desc:str,
         params:dict,
-        n_trajectories:int,
         t_norm_max:float,
         t_norm_ssz:float,
         t_norm_mul:float,
         n_observations:int,
+        n_properties:int,
         n_actions:int,
         action_maximums:list,
         action_interval:int,
@@ -119,17 +121,18 @@ class LinearEnv(BaseGymEnv):
 
         # initialize BaseGymEnv
         super().__init__(
-            n_trajectories=n_trajectories,
             t_norm_max=t_norm_max,
             t_norm_ssz=t_norm_ssz,
             t_norm_mul=t_norm_mul,
             n_observations=n_observations,
+            n_properties=n_properties,
             n_actions=n_actions,
             action_maximums=action_maximums,
             action_interval=action_interval,
             dir_prefix=(dir_prefix if dir_prefix != 'data' else ('data/' + self.name.lower()) + '/env') + '_' + '_'.join([
                 str(self.params[key]) for key in self.params
             ]),
+            file_prefix='lin_env',
             **kwargs
         )
 
@@ -138,35 +141,18 @@ class LinearEnv(BaseGymEnv):
         if 'mcqt' in self.solver_type:
             return NotImplementedError
 
-    def _step(self,
-        actions
-    ):
-        """Method to implement one step.
-
-        Parameters
-        ----------
-        actions: :class:`numpy.ndarray`
-            Actions at current time.
-        """
+    def _step(self):
+        """Method to implement one step."""
 
         # Monte-Carlo quantum trajectories
         if self.solver_type == 'mcqt':
             return NotImplementedError
         # Wiener processes
         else:
-            return self._step_wiener(
-                actions=actions
-            )
+            return self._step_wiener()
 
-    def _step_wiener(self,
-        actions
-    ):
+    def _step_wiener(self):
         """Method to implement one step of a Wiener process.
-
-        Parameters
-        ----------
-        actions: :class:`numpy.ndarray`
-            Actions at current time.
 
         Returns
         -------
@@ -182,12 +168,12 @@ class LinearEnv(BaseGymEnv):
             # get drift matrix
             M_i = self.I + self.get_A(
                 t=self.T_norm[self.t_idx + i],
-                args=[actions, None, None]
+                args=[self.actions, None, None]
             ) * self.t_norm_ssz
             # get noise
             n_i = self.get_noises(
                 t=self.T_norm[self.t_idx + i],
-                args=[actions, None, None]
+                args=[self.actions, None, None]
             )
             Observations[i] = M_i.dot(Observations[i - 1]) + n_i * self.Ws[i]
 
