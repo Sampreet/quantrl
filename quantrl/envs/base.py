@@ -6,9 +6,10 @@
 __name__    = 'quantrl.envs.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-03-01"
+__updated__ = "2024-03-17"
 
 # dependencies
+from abc import ABC, abstractmethod
 from gymnasium import Env
 from gymnasium.spaces import Box, MultiDiscrete
 from stable_baselines3.common import env_util
@@ -17,23 +18,26 @@ from tqdm import tqdm
 import numpy as np
 
 # quantrl modules
+from ..backends.base import BaseBackend
 from ..io import FileIO
 from ..plotters import TrajectoryPlotter
 
+# TODO: Optimize FileIO for BaseSB3Env
 # TODO: Interface ConsoleIO
-# TODO: Optimize BaseVecEnv truncation
-# TODO: Separate state and observation data
+# TODO: Separate environment truncation from update
 
-class BaseEnv():
+class BaseEnv(ABC):
     r"""Base environment for reinforcement-learning.
 
     Initializes ``T_norm``, ``T``, ``observation_space``, ``action_space``, ``action_steps``, ``file_path_prefix``, ``io`` and ``plotter``.
 
-    The interfaced environment needs to implement ``_step``, ``reset_observations``, ``get_properties`` and ``get_reward`` methods.
-    Refer to **Notes** below for their implementations.
+    The interfaced environment needs to implement ``_update_observations``, ``reset_observations``, and ``get_reward`` methods.
+    Additionally, the ``get_properties`` method should be overridden if ``n_properties`` is non-zero.
 
     Parameters
     ----------
+    backend: :class:`quantrl.backends.*`
+        Backend to use for numerical computations.
     t_norm_max: float
         Maximum time for each episode in normalized units.
     t_norm_ssz: float
@@ -50,11 +54,11 @@ class BaseEnv():
         Maximum values of each action with shape ``(n_actions, )``.
     action_interval: int
         Interval at which the actions are updated. Must be positive.
-    dir_prefix: str, default='data'
+    dir_prefix: str
         Prefix of the directory where the data will be stored.
-    file_prefix: str, default='base_env'
+    file_prefix: str
         Prefix of the files where the data will be stored.
-    kwargs: dict, optional
+    kwargs: dict
         Keyword arguments. Available options are:
         ========================    ================================================
         key                         value
@@ -63,8 +67,7 @@ class BaseEnv():
         observation_space_range     (*list*) range of the observations. Default is ``[-1e9, 1e9]``.
         action_space_range          (*list*) range of the actions. The output is scaled by the corresponding action multiplier. Default is ``[-1.0, 1.0]``.
         action_space_type           (*str*) the type of action space. Options are ``'binary'`` and ``'box'``. Default is ``'box``.
-        reward_max                  (*float*) maximum value of reward (implemented in children). Default is ``1.0``.
-        reward_noise                (*float*) noise in the reward function (implemented in children). Default is ``0.0``.
+        preserve_dtype              (*bool*) option to preserve the tensor data-type. If ``False``, the values are converted to NumPy arrays with the same precision. Default is ``False``.
         disk_cache_size             (*int*) number of environments to save per disk-cache. Default is ``100``.
         average_over                (*int*) number of episodes to run the running average over. This value should be less than or equal to the total number of episodes. Default is ``100``.
         plot                        (*bool*) option to plot the trajectories using ``:class:BaseTrajectoryPlotter``. Default is ``True``.
@@ -74,18 +77,6 @@ class BaseEnv():
         axes_lines_max              (*int*) maximum number of lines to display in each plot. Higher numbers slow down the run. Default is ``100``.
         axes_cols                   (*int*) number of columns in the figure. Default is ``2``.
         ========================    ================================================
-
-    Notes
-    -----
-        The following required methods follow a strict formatting:
-            ====================    ================================================
-            method                  returns
-            ====================    ================================================
-            reset_observations      the initial observations with shape either ``(n_observations, )`` or ``(n_envs, n_observations)``. These observations are then internally initialized to the last element of ``Observations`` with shape ``(action_interval + 1, n_observations, )`` or ``(action_interval + 1, n_envs, n_observations)``
-            get_properties          the properties calculated from ``Observations`` with shape either ``(action_interval + 1, n_properties)`` or ``(action_interval + 1, n_envs, n_properties)``.
-            get_reward              the reward calculated using the observations or the properties with shape either ``(action_interval + 1, )`` or ``(action_interval + 1, n_envs)``. The class attributes ``reward_max`` and ``reward_noise`` can be utilized here.
-            _step                   the updated observations with shape either ``(action_interval + 1, n_observations)`` or ``(action_interval + 1, n_envs, n_observations), formatted as ``_step(actions)``, where ``actions`` is the array of actions with shape either ``(n_actions, )`` or ``(n_envs, n_actions)`` multiplied by ``action_maximums``. This method is already implemented by the child classes in :class:`quantrl.envs.deterministic` and :class:`quantrl.envs.stochastic`.
-            ====================    ================================================
     """
 
     default_axis_args_learning_curve=['Episodes', 'Average Return', [np.sqrt(10) * 1e-4, np.sqrt(10) * 1e6], 'log']
@@ -96,8 +87,7 @@ class BaseEnv():
         observation_space_range=[-1e9, 1e9],
         action_space_range=[-1.0, 1.0],
         action_space_type='box',
-        reward_max=1.0,
-        reward_noise=0.0,
+        preserve_dtype=False,
         disk_cache_size=100,
         average_over=100,
         plot=True,
@@ -112,6 +102,7 @@ class BaseEnv():
     """dict: Default values of all keyword arguments."""
 
     def __init__(self,
+        backend:BaseBackend,
         t_norm_max:float,
         t_norm_ssz:float,
         t_norm_mul:float,
@@ -120,8 +111,8 @@ class BaseEnv():
         n_actions:int,
         action_maximums:list,
         action_interval:int,
-        dir_prefix:str='data',
-        file_prefix:str='base_env',
+        dir_prefix:str,
+        file_prefix:str,
         **kwargs
     ):
         """Class constructor for BaseEnv."""
@@ -132,6 +123,7 @@ class BaseEnv():
 
         # validate arguments
         assert t_norm_max > t_norm_ssz, "maximum normalized time should be greater than the normalized step size"
+        assert n_properties >= 0, "parameter ``n_properties`` should be non-negative"
         assert action_interval > 0, "parameter ``action_interval`` should be a positive integer"
         assert kwargs['plot_interval'] >= 0, "parameter ``plot_interval`` should be a non-negative integer"
         assert len(kwargs['plot_idxs']) == len(kwargs['axes_args']), "number of indices for plot should match number of axes arguments"
@@ -140,13 +132,27 @@ class BaseEnv():
         assert kwargs['action_space_type'] in ['binary', 'box'], "parameter ``action_space_type`` can be either ``'binary'`` or ``'box'``"
         assert kwargs['disk_cache_size'] > 0, "parameter ``disk_cache_size`` should be a positive integer"
 
+        # set backend
+        self.backend = backend
+
+        # frequently used variables
+        self.preserve_dtype = kwargs['preserve_dtype']
+        self.array_int = self.backend.dtypes['array'][self.backend.precision]['integer']
+        self.array_real = self.backend.dtypes['array'][self.backend.precision]['real']
+        self.tensor_real = self.backend.dtypes['array'][self.backend.precision]['real']
+
         # time attributes
         self.t_norm_max = t_norm_max
         self.t_norm_ssz = t_norm_ssz
         self.t_norm_mul = t_norm_mul
         # truncate before maximum time if not divisible
-        _shape_T = (int(self.t_norm_max / self.t_norm_ssz) + 1, )
-        self.T_norm = np.arange(_shape_T[0], dtype=np.float_) * self.t_norm_ssz
+        self.shape_T = (self.array_int(self.t_norm_max / self.t_norm_ssz) + 1, )
+        self.T_norm = self.backend.arange(
+            start=0,
+            stop=self.shape_T[0],
+            ssz=1,
+            dtype='real'
+        ) * self.t_norm_ssz
         self.T = self.T_norm * t_norm_mul
 
         # observation and property attributes
@@ -156,7 +162,7 @@ class BaseEnv():
             low=self.observation_space_range[0],
             high=self.observation_space_range[1],
             shape=(self.n_observations, ),
-            dtype=np.float_
+            dtype=self.tensor_real if self.preserve_dtype else self.array_real
         )
         self.n_properties = n_properties
 
@@ -176,38 +182,39 @@ class BaseEnv():
                 low=self.action_space_range[0],
                 high=self.action_space_range[1],
                 shape=(self.n_actions, ),
-                dtype=np.float_
+                dtype=self.tensor_real if self.preserve_dtype else self.array_real
             )
-        self.action_maximums = np.array(action_maximums, dtype=np.float_)
+        self.action_maximums = self.backend.convert_to_tensor(
+            array=action_maximums,
+            dtype='integer' if self.action_space_type == 'binary' else 'real'
+        )
         self.action_interval = action_interval
-        self.action_steps = int(np.ceil((self.T.shape[0] - 1) / self.action_interval))
+        self.action_steps = self.array_int(np.ceil((self.shape_T[0] - 1) / self.action_interval))
+        self.actions = None
 
         # align delay with action interval
         self.has_delay = kwargs['has_delay']
         self.t_delay = self.T[self.action_interval] - self.T[0]
-        # reward constants
-        self.reward_max = np.float_(kwargs['reward_max'])
-        self.reward_noise = np.float_(kwargs['reward_noise'])
 
         # data constants
         self.dir_path = dir_prefix + '/' + '_'.join([
-            str(self.t_norm_max),
-            str(self.t_norm_ssz),
-            str(self.t_norm_mul),
-            str(self.action_maximums),
-            str(self.action_interval)
+            str(t_norm_max),
+            str(t_norm_ssz),
+            str(t_norm_mul),
+            str(action_maximums),
+            str(action_interval)
         ])
         self.file_path_prefix = self.dir_path + '/' + file_prefix
         self.n_data = 1 + self.n_actions + self.n_observations + self.n_properties + 1
-        self.average_over = int(kwargs['average_over'])
+        self.average_over = self.array_int(kwargs['average_over'])
 
         # initialize IO
         self.io = FileIO(
-            data_shape=(self.T.shape[0], self.n_data),
+            data_shape=(self.shape_T[0], self.n_data),
             disk_cache_dir=self.file_path_prefix + '_cache',
             disk_cache_size=kwargs['disk_cache_size']
         )
-        
+
         # plot constants
         self.plot = kwargs['plot']
         self.plot_interval = kwargs['plot_interval']
@@ -224,7 +231,54 @@ class BaseEnv():
 
         # initialize buffers
         self.t_idx = 0
-        self.t = np.float_(0.0)
+        self.t = self.array_real(0.0)
+
+    @abstractmethod
+    def _update_observations(self):
+        """Method to update the observations for each step.
+
+        Returns
+        -------
+        Observations: Any
+            The updated observations ``Observations`` with shape either ``(action_interval + 1, n_observations)`` or ``(action_interval + 1, n_envs, n_observations).
+        """
+
+        raise NotImplementedError
+
+    @abstractmethod
+    def reset_observations(self):
+        """Method to obtain the initial observations.
+
+        Returns
+        -------
+        Observations: Any
+            The initial observations ``observations_0`` with shape either ``(n_observations, )`` or ``(n_envs, n_observations)``, which are assigned to all elements of ``Observations`` with shape ``(action_interval + 1, n_observations, )`` or ``(action_interval + 1, n_envs, n_observations)``.
+        """
+
+        raise NotImplementedError
+
+    def get_properties(self):
+        """Method to obtain the properties calculated at each step.
+
+        Returns
+        -------
+        Observations: Any
+            The properties calculated from ``Observations`` with shape either ``(action_interval + 1, n_properties)`` or ``(action_interval + 1, n_envs, n_properties)``.
+        """
+
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_reward(self):
+        """Method to obtain the reward calculated at each step.
+
+        Returns
+        -------
+        Observations: Any
+            The reward calculated using the observations or the properties with shape either ``(action_interval + 1, )`` or ``(action_interval + 1, n_envs)``.
+        """
+
+        raise NotImplementedError
 
     def validate_environment(self,
         shape_reset_observations:tuple,
@@ -232,7 +286,7 @@ class BaseEnv():
         shape_get_reward:tuple
     ):
         """Method to validate the interfaced environment.
-        
+
         Parameters
         ----------
         shape_reset_observations: tuple
@@ -245,77 +299,113 @@ class BaseEnv():
 
         try:
             # validate initial observations
-            observations_0 =self.reset_observations()
-            assert np.shape(observations_0) == shape_reset_observations, "``reset_observations`` should return a 2D array with shape ``{}``".format(shape_reset_observations)
+            observations_0 = self.backend.convert_to_tensor(
+                array=self.reset_observations()
+            )
+            assert self.backend.shape(
+                tensor=observations_0
+            ) == shape_reset_observations, "``reset_observations`` should return an array with shape ``{}``".format(shape_reset_observations)
             # initialize observations for each time step
-            self.Observations = np.array([observations_0]).repeat(self.action_interval + 1, axis=0)
+            self.Observations = self.backend.repeat(
+                tensor=self.backend.reshape(
+                    tensor=observations_0,
+                    shape=(1, *shape_reset_observations)
+                ),
+                repeats=self.action_interval + 1,
+                axis=0
+            )
             # validate properties
             if self.n_properties > 0:
-                self.Properties = np.array(self.get_properties())
-                assert self.Properties.shape == shape_get_properties, "``get_properties`` should return a 2D array with shape ``{}``".format(shape_get_properties)
+                self.Properties = self.backend.convert_to_tensor(
+                    array=self.get_properties()
+                )
+                assert self.backend.shape(
+                    tensor=self.Properties
+                ) == shape_get_properties, "``get_properties`` should return an array with shape ``{}``".format(shape_get_properties)
             # validate reward
-            self.Reward = np.array(self.get_reward())
-            assert self.Reward.shape == shape_get_reward, "``get_reward`` should return a 1D array with shape ``{}``".format(shape_get_reward)
+            self.Reward = self.backend.convert_to_tensor(
+                array=self.get_reward()
+            )
+            assert self.backend.shape(
+                tensor=self.Reward
+            ) == shape_get_reward, "``get_reward`` should return an array with shape ``{}``".format(shape_get_reward)
         except AttributeError as error:
             print(f"Missing required method or attribute: ({error}). Refer to **Notes** of :class:`quantrl.envs.base.BaseEnv` for the implementation format of the missing method or add the missing attribute to the ``reset_observations`` method.")
             exit()
 
     def reset(self):
-        """Method to reset the time and obtain initial observations.
-        
+        """Method to reset the time and obtain initial observations as a typed tensor.
+
         Returns
         -------
-        observations_0: :class:`numpy.ndarray`
+        observations_0: Any
             Inititial observations.
         """
 
         # reset time
         self.t_idx = 0
-        self.t = np.float_(0.0)
-        
+        self.t = self.array_real(0.0)
+
         # update observations
-        observations_0 = np.array(self.reset_observations())
-        self.Observations[-1] = observations_0
+        observations_0 = self.backend.convert_to_tensor(
+            array=self.reset_observations()
+        )
+        self.Observations = self.backend.repeat(
+            tensor=self.backend.reshape(
+                tensor=observations_0,
+                shape=(1, *self.backend.shape(
+                    tensor=observations_0
+                ))
+            ),
+            repeats=self.action_interval + 1,
+            axis=0
+        )
 
         return observations_0
 
     def update(self):
-        """Method to update the time, observations, properties and reward and obtain the final set of observations and reward.
+        """Method to update the time, observations, properties and reward and obtain the final set of observations and reward as typed tensors.
 
         Returns
         -------
-        observations: :class:`numpy.ndarray`
+        observations: Any
             Observations at current time.
-        reward: float
+        reward: Any
             Reward calculated.
         terminated: bool
             Flag to terminate trajectory.
         """
 
         # set evaluation times
-        self.T_step = self.T[self.t_idx:self.t_idx + self.action_interval + 1] if self.t_idx + self.action_interval < self.T.shape[0] else self.T[self.t_idx:]
+        _dim_T = self.shape_T[0]
+        self.T_step = self.T[self.t_idx:self.t_idx + self.action_interval + 1] if self.t_idx + self.action_interval < _dim_T else self.T[self.t_idx:]
 
         # step and update observations
-        self.Observations = self._step()
+        self.Observations = self._update_observations()
 
         # update properties
         if self.n_properties > 0:
-            self.Properties = np.array(self.get_properties())
+            self.Properties = self.backend.convert_to_tensor(
+                array=self.get_properties()
+            )
 
         # update rewards
-        self.Reward = np.array(self.get_reward())
+        self.Reward = self.backend.convert_to_tensor(
+            array=self.get_reward()
+        )
 
         # update time
-        self.t_idx += self.T_step.shape[0] - 1
+        _dim_T_step = self.backend.shape(self.T_step)[0]
+        self.t_idx += _dim_T_step - 1
         self.t = self.T[self.t_idx]
 
         # check if completed
-        terminated = False if self.t_idx + 1 < self.T.shape[0] else True
+        terminated = False if self.t_idx + 1 < _dim_T else True
 
-        return self.Observations[self.T_step.shape[0] - 1], self.Reward[self.T_step.shape[0] - 1], terminated
+        return self.Observations[_dim_T_step - 1], self.Reward[_dim_T_step - 1], terminated
 
     def plot_learning_curve(self,
-        reward_data=None,
+        reward_data:np.ndarray=None,
         n_episodes:int=None,
         axis_args:list=None,
         save_plot:bool=True,
@@ -353,13 +443,14 @@ class BaseEnv():
                 idx_end=_idx_e,
                 idxs=[-1]
             )[:, -1, :]
+            _shape = reward_data.shape
         else:
-            _idx_e = reward_data.shape[0] - 1
+            _shape = reward_data.shape
+            _idx_e = _shape[0] - 1
 
         # calculate average return and its standard deviation
-        assert reward_data.shape[0] >= self.average_over, "parameter ``average_over`` should be less than or equal to the total number of episodes"
-        _shape = reward_data.shape
-        return_avg = np.convolve(reward_data[:, 0], np.ones((self.average_over, )) / np.float_(self.average_over), mode='same').reshape(_shape)
+        assert _shape[0] >= self.average_over, "parameter ``average_over`` should be less than or equal to the total number of episodes"
+        return_avg = np.convolve(reward_data[:, 0], np.ones((self.average_over, ), dtype=self.array_real) / self.array_real(self.average_over), mode='same').reshape(_shape)
 
         # new plotter
         plotter = TrajectoryPlotter(
@@ -401,7 +492,7 @@ class BaseEnv():
         make_gif:bool=True
     ):
         """Method to replay trajectories in a given range.
-        
+
         Parameters
         ----------
         n_episodes: int
@@ -434,7 +525,9 @@ class BaseEnv():
             disable=False
         ):
             self.plotter.plot_lines(
-                xs=self.T_norm,
+                xs=self.backend.convert_to_array(
+                    tensor=self.T_norm
+                ),
                 Y=replay_data[i],
                 traj_idx=idx_start + i,
                 update_buffer=True
@@ -460,7 +553,7 @@ class BaseEnv():
         save_replay=True
     ):
         """Method to close the environment.
-        
+
         Parameters
         ----------
         n_episodes: int
@@ -491,38 +584,11 @@ class BaseEnv():
 class BaseGymEnv(BaseEnv, Env):
     r"""Gymnasium-based environment for reinforcement-learning.
 
-    Initializes ``action_space``, ``observation_space`` and ``io``, whereas ``T_norm``, ``T``, ``file_path_prefix`` and ``plotter`` are initialized by :class:`quantrl.envs.base.BaseEnv`.
-
-    The interfaced environment needs to implement ``_step``, ``reset_observations``, ``get_properties`` and ``get_reward`` methods.
-    Refer to **Notes** of :class:`quantrl.envs.base.BaseEnv` for their implementations.
-
-    Parameters
-    ----------
-    t_norm_max: float
-        Maximum time for each episode in normalized units.
-    t_norm_ssz: float
-        Normalized time stepsize.
-    t_norm_mul: float
-        Multiplier to revert the normalization.
-    n_observations: int
-        Total number of observations.
-    n_properties: int
-        Total number of properties.
-    n_actions: int
-        Total number of actions.
-    action_maximums: list
-        Maximum values of each action.
-    action_interval: int
-        Interval at which the actions are updated. Must be positive.
-    dir_prefix: str, default='data'
-        Prefix of the directory where the data will be stored.
-    file_prefix: str, default='base_gym_env'
-        Prefix of the files where the data will be stored.
-    kwargs: dict, optional
-        Keyword arguments. Refer to the ``kwargs`` parameter of :class:`quantrl.envs.base.BaseEnv` for available options.
+    Refer to :class:`quantrl.envs.base.BaseEnv` for its documentation.
     """
 
     def __init__(self,
+        backend:BaseBackend,
         t_norm_max:float,
         t_norm_ssz:float,
         t_norm_mul:float,
@@ -531,14 +597,15 @@ class BaseGymEnv(BaseEnv, Env):
         n_actions:int,
         action_maximums:list,
         action_interval:int,
-        dir_prefix='data',
-        file_prefix='base_gym_env',
+        dir_prefix:str,
+        file_prefix:str,
         **kwargs
     ):
         """Class constructor for BaseGymEnv."""
 
         # initialize BaseEnv
         super().__init__(
+            backend=backend,
             t_norm_max=t_norm_max,
             t_norm_ssz=t_norm_ssz,
             t_norm_mul=t_norm_mul,
@@ -563,16 +630,16 @@ class BaseGymEnv(BaseEnv, Env):
         Env.__init__(self)
 
         # initialize buffers
-        self.Rs = list()
+        self.gs = list()
         self.traj_idx = -1
-        self.R = 0.0
-        self.data = np.zeros((self.T.shape[0], self.n_data), dtype=np.float_)
+        self.g = 0.0
+        self.data = np.zeros((self.shape_T[0], self.n_data), dtype=self.array_real)
 
     def reset(self,
         seed:float=None,
         options:dict=None
     ):
-        """Method to reset all variables for a new trajectory.
+        """Method to reset all variables for a new trajectory and obtain the initial observations as a NumPy array or a typed tensor.
 
         Parameters
         ----------
@@ -580,40 +647,43 @@ class BaseGymEnv(BaseEnv, Env):
             Seed value for the reset.
         options: dict
             Options for the reset.
-        
+
         Returns
         -------
-        observations: :class:`numpy.ndarray`
+        observations_0: Any
             Inititial observations.
         info: str
             Information on the reset.
         """
 
-        # initialize reset
-        observations_0 = super().reset()
-
         # update buffers
         self.traj_idx += 1
-        self.R = 0.0
-        self.data = np.zeros((self.T.shape[0], self.n_data), dtype=np.float_)
+        self.g = self.array_real(0.0)
+        self.data = np.zeros((self.shape_T[0], self.n_data), dtype=self.array_real)
 
-        return observations_0, {
+        # reset variables
+        observations_0 = super().reset()
+
+        return (observations_0 if self.preserve_dtype else self.backend.convert_to_array(
+            tensor=observations_0,
+            dtype='real'
+        )), {
             'traj_idx': self.traj_idx
         }
 
     def step(self,
         actions
     ):
-        """Method to take one single step.
+        """Method to take one single step and obtain the observations and reward as NumPy arrays or typed tensors.
 
         Parameters
         ----------
-        actions: :class:`numpy.ndarray`
+        actions: Any
             Actions at current time.
 
         Returns
         -------
-        observations: :class:`numpy.ndarray`
+        observations: Any
             Observations at current time.
         reward: float
             Reward calculated.
@@ -626,13 +696,19 @@ class BaseGymEnv(BaseEnv, Env):
         """
 
         # set actions
-        self.actions = actions * self.action_maximums
+        self.actions = self.backend.convert_to_tensor(
+            array=actions,
+            dtype='real'
+        ) * self.action_maximums
 
         # get observations, properties and reward
         observations, reward, terminated = super().update()
 
         # update reward
-        self.R += reward
+        self.g += self.backend.convert_to_array(
+            tensor=reward,
+            dtype='real'
+        )
         # update data
         truncated = self.update_data()
 
@@ -641,7 +717,10 @@ class BaseGymEnv(BaseEnv, Env):
             # update plotter and io
             if self.plot and self.plot_interval and self.traj_idx % self.plot_interval == 0:
                 self.plotter.plot_lines(
-                    xs=self.T_norm,
+                    xs=self.backend.convert_to_array(
+                        tensor=self.T_norm,
+                        dtype='real'
+                    ),
                     Y=self.data[:, self.plot_idxs],
                     traj_idx=self.traj_idx,
                     update_buffer=True
@@ -650,9 +729,15 @@ class BaseGymEnv(BaseEnv, Env):
                 data=self.data
             )
             # update episode reward
-            self.Rs.append(self.R)
+            self.gs.append(self.g)
 
-        return observations, reward, terminated, truncated, {}
+        return (observations if self.preserve_dtype else self.backend.convert_to_array(
+            tensor=observations,
+            dtype='real'
+        )), (reward if self.preserve_dtype else self.backend.convert_to_array(
+            tensor=reward,
+            dtype='real'
+        )), terminated, truncated, {}
 
     def update_data(self):
         """Method to update the trajectory data for the step.
@@ -662,19 +747,35 @@ class BaseGymEnv(BaseEnv, Env):
         The next ``n_observations`` elements contain the observations.
         The next ``n_properties`` elements contain the properties.
         The final element is the cummulative reward from the step.
+
+        Returns
+        -------
+        truncated: bool
+            Flag to truncate trajectory.
         """
 
         # update data
-        _idxs = np.arange(self.t_idx - self.T_step.shape[0] + 1, self.t_idx + 1)
-        self.data[_idxs, 0] = self.T_step
-        self.data[_idxs, 1:1 + self.n_actions] = self.actions
-        self.data[_idxs, 1 + self.n_actions:1 + self.n_actions + self.n_observations] = self.Observations
+        _idxs = np.arange(self.t_idx - self.backend.shape(
+            tensor=self.T_step
+        )[0] + 1, self.t_idx + 1, 1, dtype=self.array_int)
+        self.data[_idxs, 0] = self.backend.convert_to_array(
+            tensor=self.T_step
+        )
+        self.data[_idxs, 1:1 + self.n_actions] = self.backend.convert_to_array(
+            tensor=self.actions
+        )
+        _Observations = self.backend.convert_to_array(
+            tensor=self.Observations
+        )
+        self.data[_idxs, 1 + self.n_actions:1 + self.n_actions + self.n_observations] = _Observations
         if self.n_properties > 0:
-            self.data[_idxs, 1 + self.n_actions + self.n_observations:-1] = self.Properties
-        self.data[_idxs, -1] = self.R
-        
+            self.data[_idxs, 1 + self.n_actions + self.n_observations:-1] = self.backend.convert_to_array(
+                tensor=self.Properties
+            )
+        self.data[_idxs, -1] = self.g
+
         # check if out of bounds
-        truncated = np.max(self.Observations) > self.observation_space_range[1] or np.min(self.Observations) < self.observation_space_range[0]
+        truncated = np.max(_Observations) > self.observation_space_range[1] or np.min(_Observations) < self.observation_space_range[0]
         print(f'Trajectory #{self.traj_idx} truncated') if truncated else True
 
         return truncated
@@ -683,7 +784,7 @@ class BaseGymEnv(BaseEnv, Env):
         close=True
     ):
         """Method to freely evolve the trajectory.
-        
+
         Parameters
         ----------
         close: bool, default=True
@@ -693,8 +794,8 @@ class BaseGymEnv(BaseEnv, Env):
         # evolve
         for _ in tqdm(
             range(self.action_steps),
-            desc="Progress (time)",
-            leave=False,
+            desc="Progress",
+            leave=True,
             mininterval=0.5,
             disable=False
         ):
@@ -705,7 +806,10 @@ class BaseGymEnv(BaseEnv, Env):
             _, reward, _ = super().update()
 
             # update reward
-            self.R += reward
+            self.g += self.backend.convert_to_array(
+                tensor=reward,
+                dtype='real'
+            )
             # update data
             truncated = self.update_data()
 
@@ -716,7 +820,10 @@ class BaseGymEnv(BaseEnv, Env):
         # plot
         if self.plot and self.plot_interval:
             self.plotter.plot_lines(
-                xs=self.T_norm,
+                xs=self.backend.convert_to_array(
+                    tensor=self.T_norm,
+                    dtype='real'
+                ),
                 Y=self.data[:, self.plot_idxs]
             )
             self.plotter.hold_plot()
@@ -741,10 +848,10 @@ class BaseGymEnv(BaseEnv, Env):
         if save:
             # save learning curve
             self.plot_learning_curve(
-                reward_data=np.array(self.Rs).reshape((len(self.Rs), 1)),
+                reward_data=np.array(self.gs, dtype=self.array_real).reshape((len(self.gs), 1)),
                 hold=False
             )
-        del self.Rs
+        del self.gs
 
         # close io
         self.io.close(
@@ -760,40 +867,14 @@ class BaseGymEnv(BaseEnv, Env):
 class BaseSB3Env(BaseEnv, VecEnv):
     r"""Stable-Baselines3-based vectorized environments for reinforcement-learning.
 
-    Initializes ``action_space``, ``observation_space`` and ``io``, whereas ``T_norm``, ``T``, ``file_path_prefix`` and ``plotter`` are initialized by :class:`quantrl.envs.base.BaseEnv`.
+    Initializes ``action_maximums_batch``.
+    The ``n_envs`` parameter denotes the number of environments to run in parallel and overrides the ``disk_cache_size`` parameter.
 
-    The interfaced environment needs to implement ``_step``, ``reset_observations``, ``get_properties`` and ``get_reward`` methods.
-    Refer to **Notes** of :class:`quantrl.envs.base.BaseEnv` for their implementations.
-
-    Parameters
-    ----------
-    t_norm_max: float
-        Maximum time for each episode in normalized units.
-    t_norm_ssz: float
-        Normalized time stepsize.
-    t_norm_mul: float
-        Multiplier to revert the normalization.
-    n_envs: int
-        Total number of environments to run in parallel.
-    n_observations: int
-        Total number of observations.
-    n_properties: int
-        Total number of properties.
-    n_actions: int
-        Total number of actions.
-    action_maximums: list
-        Maximum values of each action.
-    action_interval: int
-        Interval at which the actions are updated. Must be positive.
-    dir_prefix: str, default='data'
-        Prefix of the directory where the data will be stored.
-    file_prefix: str, default='base_vec_env'
-        Prefix of the files where the data will be stored.
-    kwargs: dict, optional
-        Keyword arguments. Refer to the ``kwargs`` parameter of :class:`quantrl.envs.base.BaseEnv` for available options. Here, the parameter ``disk_cache_size`` is set to ``n_envs``.
+    Refer to :class:`quantrl.envs.base.BaseEnv` for complete documentation.
     """
 
     def __init__(self,
+        backend:BaseBackend,
         t_norm_max:float,
         t_norm_ssz:float,
         t_norm_mul:float,
@@ -803,14 +884,15 @@ class BaseSB3Env(BaseEnv, VecEnv):
         n_actions:int,
         action_maximums:list,
         action_interval:int,
-        dir_prefix='data',
-        file_prefix='base_vec_env',
+        dir_prefix:str,
+        file_prefix:str,
         **kwargs
     ):
         """Class constructor for BaseSB3Env."""
 
         # initialize BaseEnv
         super().__init__(
+            backend=backend,
             t_norm_max=t_norm_max,
             t_norm_ssz=t_norm_ssz,
             t_norm_mul=t_norm_mul,
@@ -828,7 +910,14 @@ class BaseSB3Env(BaseEnv, VecEnv):
         # update attributes
         self.n_envs = n_envs
         self.render_mode = [None] * n_envs
-        self.action_maximums_batch = np.array([self.action_maximums]).repeat(self.n_envs, axis=0)
+        self.action_maximums_batch = self.backend.repeat(
+            tensor=self.backend.reshape(
+                tensor=self.action_maximums,
+                shape=(1, self.n_actions)
+            ),
+            repeats=self.n_envs,
+            axis=0
+        )
 
         # validate interfaced environment
         self.validate_environment(
@@ -845,10 +934,10 @@ class BaseSB3Env(BaseEnv, VecEnv):
         )
 
         # initialize buffers
-        self.Rs = list()
+        self.Gs = list()
         self.batch_idx = -1
-        self.R = np.zeros(self.n_envs, dtype=np.float_)
-        self.data = np.zeros((self.T.shape[0], self.n_envs, self.n_data), dtype=np.float_)
+        self.G = np.zeros(self.n_envs, dtype=self.array_real)
+        self.data = np.zeros((self.shape_T[0], self.n_envs, self.n_data), dtype=self.array_real)
 
     def env_is_wrapped(self,
         wrapper_class,
@@ -870,7 +959,7 @@ class BaseSB3Env(BaseEnv, VecEnv):
         """
 
         return [env_util.is_wrapped(self, wrapper_class) for _ in range(indices if indices is not None else self.n_envs)]
-    
+
     def env_method(self,
         method_name,
         *method_args,
@@ -897,7 +986,7 @@ class BaseSB3Env(BaseEnv, VecEnv):
         """
 
         return [getattr(self, method_name)(*method_args, **method_kwargs) for _ in range(indices if indices is not None else self.n_envs)]
-    
+
     def get_attr(self,
         attr_name,
         indices=None         
@@ -918,7 +1007,7 @@ class BaseSB3Env(BaseEnv, VecEnv):
         """
 
         return [getattr(self, attr_name) for _ in range(indices if indices is not None else self.n_envs)]
-    
+
     def set_attr(self,
         attr_name,
         value,
@@ -942,7 +1031,7 @@ class BaseSB3Env(BaseEnv, VecEnv):
         seed:float=None,
         options:dict=None
     ):
-        """Method to reset all variables for a new batch.
+        """Method to reset all variables for a new batch and obtain the initial observations as a NumPy array or a typed tensor.
 
         Parameters
         ----------
@@ -950,25 +1039,37 @@ class BaseSB3Env(BaseEnv, VecEnv):
             Seed value for the reset.
         options: dict
             Options for the reset.
-        
+
         Returns
         -------
-        observations_0: :class:`numpy.ndarray`
+        observations_0: Any
             Inititial observations.
-        info: str
-            Information on the reset.
         """
 
-        # initialize reset
-        observations_0 = super().reset()
+        # reset variables
+        observations_0 = self._reset()
+
+        return observations_0 if self.preserve_dtype else self.backend.convert_to_array(
+            tensor=observations_0,
+            dtype='real'
+        )
+
+    def _reset(self):
+        """Method to reset all variables for a new batch and obtain the initial observations as a typed tensor.
+
+        Returns
+        -------
+        observations_0: Any
+            Inititial observations.
+        """
 
         # update buffers
         self.batch_idx += 1
-        self.R = np.zeros(self.n_envs, dtype=np.float_)
-        self.data = np.zeros((self.T.shape[0], self.n_envs, self.n_data), dtype=np.float_)
+        self.G = np.zeros(self.n_envs, dtype=self.array_real)
+        self.data = np.zeros((self.shape_T[0], self.n_envs, self.n_data), dtype=self.array_real)
 
-        return observations_0
-    
+        return super().reset()
+
     def step_async(self,
         actions
     ):
@@ -976,19 +1077,22 @@ class BaseSB3Env(BaseEnv, VecEnv):
 
         Parameters
         ----------
-        actions: :class:`numpy.ndarray`
+        actions: Any
             Actions at current time.
         """
 
         # set actions
-        self.actions = actions * self.action_maximums_batch
+        self.actions = self.backend.convert_to_tensor(
+            array=actions,
+            dtype='real'
+        ) * self.action_maximums_batch
 
     def step_wait(self):
         """Method to take one single step and wait for the result.
 
         Returns
         -------
-        observations: :class:`numpy.ndarray`
+        observations: Any
             Observations at current time.
         reward: float
             Reward calculated for the action interval.
@@ -1002,7 +1106,10 @@ class BaseSB3Env(BaseEnv, VecEnv):
         observations, reward, terminated = super().update()
 
         # update reward
-        self.R += reward
+        self.G += self.backend.convert_to_array(
+            tensor=reward,
+            dtype='real'
+        )
         # update data
         truncated = self.update_data()
 
@@ -1011,11 +1118,14 @@ class BaseSB3Env(BaseEnv, VecEnv):
         if terminated or truncated:
             # update plotter and io
             if self.plot and self.plot_interval:
-                _arr = np.arange(self.n_envs, dtype=np.int_)
+                _arr = np.arange(self.n_envs, dtype=self.array_int)
                 _idxs = _arr[(self.batch_idx * self.n_envs + _arr) % self.plot_interval == 0]
                 for _idx in _idxs:
                     self.plotter.plot_lines(
-                        xs=self.T_norm,
+                        xs=self.backend.convert_to_array(
+                            tensor=self.T_norm,
+                            dtype='real'
+                        ),
                         Y=self.data[:, _idx, self.plot_idxs],
                         traj_idx=self.batch_idx * self.n_envs + _idx,
                         update_buffer=True
@@ -1025,18 +1135,26 @@ class BaseSB3Env(BaseEnv, VecEnv):
                 batch_idx=self.batch_idx
             )
             # update episode reward
-            self.Rs.append(self.R)
+            self.Gs.append(self.G)
 
-            # update info
-            infos = [{
-                "Timelimit.truncated": True,
-                "terminal_observation": obs
-            } for obs in observations]
+            # # update info
+            # for i in range(len(observations)):
+            #     infos[i]["Timelimit.truncated"] = True,
+            #     infos[i]["terminal_observation"] = self.backend.convert_to_array(
+            #         tensor=observations[i],
+            #         dtype='real'
+            #     )
 
-            # reset environment
-            observations = self.reset()
+            # reset variables
+            observations = self._reset()
 
-        return observations, reward, [terminated or truncated] * self.n_envs, infos
+        return (observations if self.preserve_dtype else self.backend.convert_to_array(
+            tensor=observations,
+            dtype='real'
+        )), (reward if self.preserve_dtype else self.backend.convert_to_array(
+            tensor=reward,
+            dtype='real'
+        )), [terminated or truncated] * self.n_envs, infos
 
     def update_data(self):
         """Method to update the batch data for the step.
@@ -1046,19 +1164,37 @@ class BaseSB3Env(BaseEnv, VecEnv):
         The next ``n_observations`` elements contain the batch of observations.
         The next ``n_properties`` elements contain the batch of properties.
         The final element is the batch of cummulative reward from the step.
+
+        Returns
+        -------
+        truncated: bool
+            Flag to truncate trajectory.
         """
 
         # update data
-        _idxs = np.arange(self.t_idx - self.T_step.shape[0] + 1, self.t_idx + 1)
-        self.data[_idxs, :, 0] = self.T_step.repeat(self.n_envs).reshape((self.T_step.shape[0], self.n_envs))
-        self.data[_idxs, :,  1:1 + self.n_actions] = self.actions
-        self.data[_idxs, :, 1 + self.n_actions:1 + self.n_actions + self.n_observations] = self.Observations
+        _idxs = np.arange(self.t_idx - self.backend.shape(
+            tensor=self.T_step
+        )[0] + 1, self.t_idx + 1, 1, dtype=self.array_int)
+        self.data[_idxs, :, 0] = self.backend.convert_to_array(
+            tensor=self.T_step
+        ).repeat(self.n_envs).reshape((self.backend.shape(
+            tensor=self.T_step
+        )[0], self.n_envs))
+        self.data[_idxs, :,  1:1 + self.n_actions] = self.backend.convert_to_array(
+            tensor=self.actions
+        )
+        _Observations = self.backend.convert_to_array(
+            tensor=self.Observations
+        )
+        self.data[_idxs, :, 1 + self.n_actions:1 + self.n_actions + self.n_observations] = _Observations
         if self.n_properties > 0:
-            self.data[_idxs, :, 1 + self.n_actions + self.n_observations:-1] = self.Properties
-        self.data[_idxs, :, -1] = self.R
+            self.data[_idxs, :, 1 + self.n_actions + self.n_observations:-1] =self.backend.convert_to_array(
+                tensor=self.Properties
+            )
+        self.data[_idxs, :, -1] = self.G
 
         # check if out of bounds
-        truncated = np.max(self.Observations) > self.observation_space_range[1] or np.min(self.Observations) < self.observation_space_range[0]
+        truncated = np.max(_Observations) > self.observation_space_range[1] or np.min(_Observations) < self.observation_space_range[0]
         print(f'Batch #{self.batch_idx} truncated') if truncated > 0 else True
 
         return truncated
@@ -1068,7 +1204,7 @@ class BaseSB3Env(BaseEnv, VecEnv):
         save=False
     ):
         """Method to freely evolve the trajectory.
-        
+
         Parameters
         ----------
         close: bool, default=True
@@ -1080,8 +1216,8 @@ class BaseSB3Env(BaseEnv, VecEnv):
         # evolve
         for _ in tqdm(
             range(self.action_steps),
-            desc="Progress (time)",
-            leave=False,
+            desc="Progress",
+            leave=True,
             mininterval=0.5,
             disable=False
         ):
@@ -1092,24 +1228,30 @@ class BaseSB3Env(BaseEnv, VecEnv):
             _, reward, _ = super().update()
 
             # update reward
-            self.R += reward
+            self.G += self.backend.convert_to_array(
+                tensor=reward,
+                dtype='real'
+            )
             # update data
             truncated = self.update_data()
 
             # stop if out of bounds
             if truncated:
                 break
-            
+
         # update episode reward
-        self.Rs.append(self.R)
+        self.Gs.append(self.G)
 
         # plot
         if self.plot and self.plot_interval:
-            _arr = np.arange(self.n_envs, dtype=np.int_)
+            _arr = np.arange(self.n_envs, dtype=self.array_int)
             _idxs = _arr[_arr % self.plot_interval == 0]
             for _idx in _idxs:
                 self.plotter.plot_lines(
-                    xs=self.T_norm,
+                    xs=self.backend.convert_to_array(
+                        tensor=self.T_norm,
+                        dtype='real'
+                    ),
                     Y=self.data[:, _idx, self.plot_idxs],
                     traj_idx=_idx,
                     update_buffer=True
@@ -1126,7 +1268,7 @@ class BaseSB3Env(BaseEnv, VecEnv):
         save=True
     ):
         """Method to close the environment.
-        
+
         Parameters
         ----------
         save: bool, default=True
@@ -1136,10 +1278,10 @@ class BaseSB3Env(BaseEnv, VecEnv):
         if save:
             # save learning curve
             self.plot_learning_curve(
-                reward_data=np.array(self.Rs).reshape((len(self.Rs) * self.n_envs, 1)),
+                reward_data=np.array(self.Gs, dtype=self.array_real).reshape((len(self.Gs) * self.n_envs, 1)),
                 hold=False
             )
-        del self.Rs
+        del self.Gs
 
         # close io
         self.io.close(

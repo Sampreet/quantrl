@@ -5,10 +5,10 @@ with open('README.md', 'r') as file_readme:
 
 setup(
     name='quantrl',
-    version='0.0.5',
+    version='0.0.6',
     author='Sampreet Kalita',
     author_email='sampreet.kalita@hotmail.com',
-    desctiption='The Quantum Toolbox for Reinforcement Learning',
+    desctiption='Quantum Control with Reinforcement Learning',
     long_description=long_desc,
     long_description_content_type='text/markdown',
     keywords=['quantum', 'toolbox', 'reinforcement learning', 'python3'],

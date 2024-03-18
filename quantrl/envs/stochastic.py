@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.stochastic'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-03-01"
+__updated__ = "2024-03-18"
 
 # dependencies
 import numpy as np
@@ -14,19 +14,21 @@ import numpy as np
 # quantrl modules
 from .base import BaseGymEnv
 
-# TODO: Implement MCQT
-# TODO: Implement delay function
+# TODO: Separate iterative solver to support JAX
+# TODO: Add MCQT
+# TODO: Add delay feature
 
 class LinearEnv(BaseGymEnv):
-    """Class to interface stochastic linear environments.
+    """Class to interface stochastic linear environments using Wiener increments.
 
-    Initializes ``A``.
-
+    Initializes ``A`` and ``is_A_constant``.
     The interfaced environment requires ``default_params`` dictionary defined before initializing the parent class.
-    The interfaced environment needs to implement ``reset_observations``, ``get_properties`` and ``get_reward`` methods.
+
+    The interfaced environment needs to implement ``reset_observations`` and ``get_reward`` methods.
+    Additionally, the ``get_properties`` method should be overridden if ``n_properties`` is non-zero.
     Refer to **Notes** of :class:`quantrl.envs.base.BaseEnv` for their implementations.
-    The ``_step_wiener`` method requires ``get_M`` for the evolution matrices and the ``get_noise`` for the noise values.
-    Refer to **Notes** below for their implementations.
+
+    The ``_update_observations`` method requires ``get_A`` for the Jacobian of the observations and the ``get_noise`` for the noise values.
 
     Parameters
     ----------
@@ -52,40 +54,23 @@ class LinearEnv(BaseGymEnv):
         Maximum values of each action.
     action_interval: int
         Interval at which the actions are updated. Must be positive.
-    solver_type: str, optional
-        Solver to evolve each time step. Options are ``'mcqt'`` for Monte-Carlo quantum trajectories and ``'wiener'`` for Weiner processes. Default is ``'wiener'``.
+    backend_library: str, default='numpy'
+        Solver to use for each step. Options are ``'torch'`` for PyTorch-based solvers, ``'jax'`` for JAX-based solvers and ``'numpy'`` for NumPy/SciPy-based solvers.
+    backend_precision: str, default='double'
+        Precision of the numerical values in the backend. Options are ``'single'`` and ``'double'``.
+    backend_device: str, default='cuda'
+        Device to run the solver. Options are ``'cpu'`` and ``'cuda'``.
     dir_prefix: str, default='data'
         Prefix of the directory where the data will be stored.
     kwargs: dict, optional
-        Keyword arguments. Refer to the ``kwargs`` parameter of :class:`quantrl.envs.base.BaseEnv` for available options. Additional options are:
-        ============    ================================================
-        key             value
-        ============    ================================================
-        ode_method      (*str*) method used to solve the ODEs/DDEs if ``solver_type`` is ``'mcqt'``. Available options are ``'BDF'``, ``'DOP853'``, ``'LSODA'``, ``'Radau'``, ``'RK23'``, ``'RK45'``, ``'dop853'``, ``'dopri5'``, ``'lsoda'``, ``'zvode'`` and ``'vode'``. Default is ``'vode'``.
-        ode_atol        (*float*) absolute tolerance of the ODE/DDE solver. Default is ``1e-12``.
-        ode_rtol        (*float*) relative tolerance of the ODE/DDE solver. Default is ``1e-6``.
-        ============    ================================================
-
-    Notes
-    -----
-        The following required methods follow a strict formatting:
-            ============    ================================================
-            method          returns
-            ============    ================================================
-            get_A           the drift matrix with shape ``(n_observations, n_observations)``, formatted as ``get_A(t, args)``, where ``args`` is a list containing the array of actions at normalized time ``t``, the control function formatted as ``func_control(t)`` and the delay function formatted as ``func_delay(t)``..
-            get_noises      the prefixes for the noise vector with shape ``(n_observations, )``. It follows the same formatting as ``get_A``.
-            ============    ================================================
+        Keyword arguments. Refer to the ``kwargs`` parameter of :class:`quantrl.envs.base.BaseEnv` for available options.
     """
 
     default_params = dict()
     """dict: Default parameters of the environment."""
 
-    default_ode_solver_params = dict(
-        ode_method='vode',
-        ode_atol=1e-12,
-        ode_rtol=1e-6
-    )
-    """dict: Default parameters of the ODE solver."""
+    backend_libraries = ['torch', 'jax', 'numpy']
+    """list: Available backend libraries."""
 
     def __init__(self,
         name:str,
@@ -99,28 +84,58 @@ class LinearEnv(BaseGymEnv):
         n_actions:int,
         action_maximums:list,
         action_interval:int,
-        solver_type:str='wiener',
+        backend_library:str='numpy',
+        backend_precision:str='double',
+        backend_device:str='cuda',
         dir_prefix:str='data',
         **kwargs
     ):
         """Class constructor for LinearEnv."""
 
+        # validate arguments
+        assert backend_library in self.backend_libraries, "parameter ``solver_type`` should be one of ``{}``".format(self.backend_libraries)
+
+        # select backend
+        if 'torch' in backend_library:
+            from ..backends.torch import TorchBackend
+            backend = TorchBackend(
+                precision=backend_precision,
+                device=backend_device
+            )
+        elif 'jax' in backend_library:
+            from ..backends.jax import JaxBackend
+            backend = JaxBackend(
+                precision=backend_precision
+            )
+        else:
+            from ..backends.numpy import NumPyBackend
+            backend = NumPyBackend(
+                precision=backend_precision
+            )
+
         # set constants
         self.name = name
         self.desc = desc
+
         # set parameters
         self.params = dict()
         for key in self.default_params:
             self.params[key] = params.get(key, self.default_params[key])
-        # update keyword arguments
-        for key in self.default_ode_solver_params:
-            kwargs[key] = kwargs.get(key, self.default_ode_solver_params[key])
         # set matrices
-        self.I = np.eye(n_observations, dtype=np.float_)
-        self.A = np.zeros((n_observations, n_observations), dtype=np.float_)
+        self.I = backend.eye(
+            rows=n_observations,
+            cols=None,
+            dtype='real'
+        )
+        self.A = backend.zeros(
+            shape=(n_observations, n_observations),
+            dtype='real'
+        )
+        self.is_A_constant = False
 
         # initialize BaseGymEnv
         super().__init__(
+            backend=backend,
             t_norm_max=t_norm_max,
             t_norm_ssz=t_norm_ssz,
             t_norm_mul=t_norm_mul,
@@ -137,44 +152,92 @@ class LinearEnv(BaseGymEnv):
         )
 
         # initialize solver
-        self.solver_type = solver_type
-        if 'mcqt' in self.solver_type:
-            return NotImplementedError
+        self.seeds = np.random.default_rng().integers(low=0, high=1000, size=self.shape_T, endpoint=False, dtype=np.int32)
 
-    def _step(self):
-        """Method to implement one step."""
+        # initialize buffers
+        self.matmul_0 = self.backend.empty(
+            shape=(self.n_observations, ),
+            dtype='real'
+        )
 
-        # Monte-Carlo quantum trajectories
-        if self.solver_type == 'mcqt':
-            return NotImplementedError
-        # Wiener processes
-        else:
-            return self._step_wiener()
-
-    def _step_wiener(self):
-        """Method to implement one step of a Wiener process.
-
-        Returns
-        -------
-        Observations: :class:`numpy.ndarray`
-            Observations for the action interval.
-        """
+    def _update_observations(self):
+        # frequently used variables
+        _shape = self.backend.shape(
+            tensor=self.T_step
+        )
+        self.Ws = self.backend.normal(
+            shape=_shape,
+            mean=0.0,
+            std=np.sqrt(self.t_norm_ssz),
+            seed=int(self.seeds[self.t_idx]),
+            dtype='real'
+        )
 
         # increment observations
-        self.Ws = np.sqrt(self.t_norm_ssz) * np.random.normal(loc=0.0, scale=1.0, size=(self.T_step.shape[0]))
-        Observations = np.empty((self.T_step.shape[0], self.n_observations), dtype=np.float_)
-        Observations[0] = self.Observations[-1]
-        for i in range(1, self.T_step.shape[0]):
+        Observations = tuple()
+        Observations += (self.Observations[-1] + 0.0, )
+        for i in range(1, _shape[0]):
             # get drift matrix
             M_i = self.I + self.get_A(
                 t=self.T_norm[self.t_idx + i],
                 args=[self.actions, None, None]
             ) * self.t_norm_ssz
-            # get noise
-            n_i = self.get_noises(
+            # get noise prefixes
+            n_i = self.get_noise_prefixes(
                 t=self.T_norm[self.t_idx + i],
                 args=[self.actions, None, None]
             )
-            Observations[i] = M_i.dot(Observations[i - 1]) + n_i * self.Ws[i]
+            # update observations
+            Observations += (self.backend.matmul(
+                tensor_0=M_i,
+                tensor_1=Observations[i - 1],
+                out=self.matmul_0
+            ) + n_i * self.Ws[i], )
 
-        return Observations
+        return self.backend.stack(
+            tensors=Observations,
+            axis=0,
+            out=self.Observations
+        )
+
+    def get_A(self,
+        t,
+        args
+    ):
+        """Method to obtain the Jacobian of the observations.
+
+        Parameters
+        ----------
+        t: float
+            Time at which the values are calculated.
+        args: tuple
+            Actions, control function and delay function.
+
+        Returns
+        -------
+        A: Any
+            Jacobian of the observations with shape ``(n_observations, n_observations)``.
+        """
+
+        raise NotImplementedError
+
+    def get_noise_prefixes(self,
+        t,
+        args
+    ):
+        """Method to obtain the noise prefixes for each observations.
+
+        Parameters
+        ----------
+        t: float
+            Time at which the values are calculated.
+        args: tuple
+            Actions, control function and delay function.
+
+        Returns
+        -------
+        noise_prefixes: Any
+            Noise prefixes for each observation with shape ``(n_observations, )``.
+        """
+
+        raise NotImplementedError

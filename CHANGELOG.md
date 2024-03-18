@@ -1,5 +1,22 @@
 # Changelog
 
+## 2024/03/18 - 00 - v0.0.6 - PyTorch and JAX Backends
+* Added `quantrl.backends` package:
+    * Added abstract base class `BaseBackend` for different backends in `base` module.
+    * Interfaced JAX, PyTorch and NumPy backends in `jax`, `torch` and `numpy` modules.
+* Updated `quantrl.envs.base` module:
+    * Created and documented abstract methods for `BaseEnv` class.
+    * Renamed ``_step`` method to ``_update_observations``.
+    * Interfaced backends in `BaseEnv`, `BaseGymEnv` and `BaseSB3Env` classes.
+    * Added parameter ``preserve_dtype`` to preserve the interfaced tensor data-type in `BaseEnv` class.
+    * Removed truncation information from ``step_async`` in `BaseSB3Env` class.
+* Updated `quantrl.envs.deterministic` module:
+    * Interfaced backends in `LinearizedHOEnv` and `LinearizedHOVecEnv` classes.
+    * Added template methods for ``get_A``, ``get_D`` and ``get_mode_rates`` and updated documentation.
+* Interfaced backends and removed MCQT support in `quantrl.envs.stochastic.LinearEnv` class.
+* Added `base` solver module and interfaces for three different IVP solvers (`jax.DiffraxIVPSolver`, `torch.TorchDiffEqIVPSolver` and `numpy.SciPyIVPSolver` classes) in `quantrl.solvers` package.
+* Updated `README` and `setup`.
+
 ## 2024/03/01 - 00 - v0.0.5 - Vectorized Environments
 * Updated `quantrl.envs.base` module:
     * ``reset_Observations``, ``get_Properties`` and ``get_Reward`` methods of all classes are renamed to ``reset_observations``, ``get_properties`` and ``get_reward``, with ``reset_observations`` returning the initial observations.
