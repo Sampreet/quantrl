@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.deterministic'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-03-17"
+__updated__ = "2024-03-22"
 
 # quantrl modules
 from .base import BaseGymEnv, BaseSB3Env
@@ -52,6 +52,8 @@ class LinearizedHOEnv(BaseGymEnv):
         Maximum values of each action.
     action_interval: int
         Interval at which the actions are updated. Must be positive.
+    data_idxs: list
+        Indices of the data to store into the ``data`` attribute. The indices can be selected from the complete set of values at each point of time (total ``1 + n_actions + n_observations + n_properties + 1`` elements in the same order, where the first element is the time and the last element is the reward).
     backend_library: str, default='numpy'
         Solver to use for each step. Options are ``'torch'`` for PyTorch-based solvers, ``'jax'`` for JAX-based solvers and ``'numpy'`` for NumPy/SciPy-based solvers.
     backend_precision: str, default='double'
@@ -98,6 +100,7 @@ class LinearizedHOEnv(BaseGymEnv):
         n_actions:int,
         action_maximums:list,
         action_interval:int,
+        data_idxs:list,
         backend_library:str='numpy',
         backend_precision:str='double',
         backend_device:str='cuda',
@@ -167,9 +170,8 @@ class LinearizedHOEnv(BaseGymEnv):
             n_actions=n_actions,
             action_maximums=action_maximums,
             action_interval=action_interval,
-            dir_prefix=(dir_prefix if dir_prefix != 'data' else ('data/' + self.name.lower()) + '/env') + '_' + '_'.join([
-                str(self.params[key]) for key in self.params
-            ]),
+            data_idxs=data_idxs,
+            dir_prefix=(dir_prefix if dir_prefix != 'data' else ('data/' + self.name.lower()) + '/env'),
             file_prefix='lho_env',
             **kwargs
         )
@@ -177,14 +179,14 @@ class LinearizedHOEnv(BaseGymEnv):
         # initialize solver
         self.solver = IVPSolverClass(
             func=self.func,
-            y0=self.Observations[-1],
+            y_0=self.Observations[-1],
             T=self.T,
             solver_params={
                 'method': kwargs['ode_method'],
                 'atol': kwargs['ode_atol'],
                 'rtol': kwargs['ode_rtol'],
                 'is_stiff': False,
-                'step_dim': self.action_interval
+                'step_interval': self.action_interval
             },
             func_controls=getattr(self, 'func_controls', None),
             has_delay=self.has_delay,
@@ -223,19 +225,17 @@ class LinearizedHOEnv(BaseGymEnv):
 
     def _update_observations(self):
         return self.solver.step(
-            y0=self.Observations[-1],
             T_step=self.T_step,
+            y_0=self.Observations[-1],
             params=self.actions
         )
 
     def func(self,
         t,
         y,
-        args
+        args:tuple
     ):
-        r"""Wrapper function for the rates of change of the real-valued modes and correlations.
-
-        The variables are cast to real.
+        """Method to obtain the rates of change of the real-valued modes and correlations.
 
         Parameters
         ----------
@@ -326,7 +326,7 @@ class LinearizedHOEnv(BaseGymEnv):
     def get_A(self,
         t,
         modes,
-        args
+        args:tuple
     ):
         """Method to obtain the Jacobian of quantum fluctuation quadratures.
 
@@ -350,7 +350,7 @@ class LinearizedHOEnv(BaseGymEnv):
     def get_D(self,
         t,
         modes,
-        args
+        args:tuple
     ):
         """Method to obtain the quantum noise correaltions.
 
@@ -398,7 +398,7 @@ class LinearizedHOEnv(BaseGymEnv):
     def get_mode_rates_real(self,
         t,
         modes_real,
-        args
+        args:tuple
     ):
         """Method to obtain the real-valued rates of change of the classical mode amplitudes.
 
@@ -449,6 +449,9 @@ class LinearizedHOVecEnv(BaseSB3Env):
 
     Initializes ``dim_corrs``, ``num_corrs``, ``A``, ``D``, ``is_A_constant``, ``is_D_constant`` and ``solver``.
     The interfaced environment requires ``default_params`` dictionary defined before initializing the parent class.
+    The paramter ``n_envs`` overrides the ``cache_dump_interval`` parameter.
+    For massively parallel models, the ``data_idxs`` parameter should be carefully selected to initialize the ``data`` attribute with shape ``(n_envs, t_dim, n_data_idxs)``.
+    In such cases, it is advisable to use the JAX backend with the ``cache_all_data`` paramter to ``False``.
 
     The interfaced environment needs to implement ``reset_observations`` and ``get_reward`` methods.
     Additionally, the ``get_properties`` method should be overridden if ``n_properties`` is non-zero.
@@ -474,7 +477,7 @@ class LinearizedHOVecEnv(BaseSB3Env):
     t_norm_mul: float
         Multiplier to revert the normalization.
     n_envs: int
-        Number of environments to run in parallel. This value overrides the optional ``disk_cache_size`` parameter.
+        Number of environments to run in parallel. This value overrides the optional ``cache_dump_interval`` parameter.
     n_observations: int
         Total number of observations.
     n_properties: int
@@ -485,6 +488,8 @@ class LinearizedHOVecEnv(BaseSB3Env):
         Maximum values of each action.
     action_interval: int
         Interval at which the actions are updated. Must be positive.
+    data_idxs: list
+        Indices of the data to store into the ``data`` attribute. The indices can be selected from the complete set of values at each point of time (total ``1 + n_actions + n_observations + n_properties + 1`` elements in the same order, where the first element is the time and the last element is the reward).
     backend_library: str, default='numpy'
         Solver to use for each step. Options are ``'torch'`` for PyTorch-based solvers, ``'jax'`` for JAX-based solvers and ``'numpy'`` for NumPy/SciPy-based solvers.
     backend_precision: str, default='double'
@@ -532,6 +537,7 @@ class LinearizedHOVecEnv(BaseSB3Env):
         n_actions:int,
         action_maximums:list,
         action_interval:int,
+        data_idxs:list,
         backend_library:str='numpy',
         backend_precision:str='double',
         backend_device:str='cuda',
@@ -602,9 +608,8 @@ class LinearizedHOVecEnv(BaseSB3Env):
             n_actions=n_actions,
             action_maximums=action_maximums,
             action_interval=action_interval,
-            dir_prefix=(dir_prefix if dir_prefix != 'data' else ('data/' + self.name.lower()) + '/env') + '_' + '_'.join([
-                str(self.params[key]) for key in self.params
-            ]),
+            data_idxs=data_idxs,
+            dir_prefix=(dir_prefix if dir_prefix != 'data' else ('data/' + self.name.lower()) + '/env'),
             file_prefix='lho_vec_env',
             **kwargs
         )
@@ -612,14 +617,14 @@ class LinearizedHOVecEnv(BaseSB3Env):
         # initialize solver
         self.solver = IVPSolverClass(
             func=self.func,
-            y0=self.Observations[-1],
+            y_0=self.Observations[-1],
             T=self.T,
             solver_params={
                 'method': kwargs['ode_method'],
                 'atol': kwargs['ode_atol'],
                 'rtol': kwargs['ode_rtol'],
                 'is_stiff': False,
-                'step_dim': self.action_interval
+                'step_interval': self.action_interval
             },
             func_controls=getattr(self, 'func_controls', None),
             has_delay=self.has_delay,
@@ -658,15 +663,15 @@ class LinearizedHOVecEnv(BaseSB3Env):
 
     def _update_observations(self):
         return self.solver.step(
-            y0=self.Observations[-1],
             T_step=self.T_step,
+            y_0=self.Observations[-1],
             params=self.actions
         )
 
     def func(self,
         t,
         y,
-        args
+        args:tuple
     ):
         r"""Wrapper function for the rates of change of the real-valued modes and correlations.
 
@@ -761,7 +766,7 @@ class LinearizedHOVecEnv(BaseSB3Env):
     def get_A(self,
         t,
         modes,
-        args
+        args:tuple
     ):
         """Method to obtain the Jacobian of quantum fluctuation quadratures.
 
@@ -785,7 +790,7 @@ class LinearizedHOVecEnv(BaseSB3Env):
     def get_D(self,
         t,
         modes,
-        args
+        args:tuple
     ):
         """Method to obtain the quantum noise correaltions.
 
@@ -809,7 +814,7 @@ class LinearizedHOVecEnv(BaseSB3Env):
     def get_mode_rates(self,
         t,
         modes,
-        args
+        args:tuple
     ):
         """Method to obtain the rates of change of the classical mode amplitudes.
 
@@ -833,7 +838,7 @@ class LinearizedHOVecEnv(BaseSB3Env):
     def get_mode_rates_real(self,
         t,
         modes_real,
-        args
+        args:tuple
     ):
         """Method to obtain the real-valued mode rates from real-valued modes.
 

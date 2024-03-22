@@ -6,14 +6,14 @@
 __name__    = 'quantrl.solvers.torch'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-03-15"
+__updated__ = "2024-03-20"
 
 # dependencies
 from torchdiffeq import odeint
 
 # quantrl modules
 from ..backends.torch import TorchBackend
-from .base import BaseIVPSolver
+from .base import BaseIVPSolver, BaseIterativeSolver
 
 # TODO: Implement interpolation
 
@@ -30,7 +30,7 @@ class TorchDiffEqIVPSolver(BaseIVPSolver):
 
     def __init__(self,
         func,
-        y0,
+        y_0,
         T,
         solver_params:dict,
         func_controls=None,
@@ -42,7 +42,7 @@ class TorchDiffEqIVPSolver(BaseIVPSolver):
         # initialize BaseIVPSolver
         super().__init__(
             func=func,
-            y0=y0,
+            y_0=y_0,
             T=T,
             solver_params=solver_params,
             func_controls=func_controls,
@@ -56,19 +56,19 @@ class TorchDiffEqIVPSolver(BaseIVPSolver):
         )
 
     def integrate(self,
-        y0,
         T_step,
+        y_0,
         params=None
     ):
         # convert to tensor
-        y0 = self.get_tensor(
-            array=y0
+        y_0 = self.backend.convert_to_typed(
+            tensor=y_0
         )
 
         # integrate
         return odeint(
             func=lambda t, y: self.func(t, y, [params, self.func_controls, self.func_delay]),
-            y0=y0,
+            y0=y_0,
             t=T_step,
             atol=self.solver_params['atol'],
             rtol=self.solver_params['rtol'],
@@ -77,6 +77,46 @@ class TorchDiffEqIVPSolver(BaseIVPSolver):
         )
     
     def interpolate(self,
-        T, Y
+        T_step,
+        Y
     ):
         raise NotImplementedError
+
+class TorchIterativeSolver(BaseIterativeSolver):
+    """Iteratively solve using PyTorch.
+
+    Refer to :class:`quantrl.backends.base.BaseIterativeSolver` for its implementation.
+    """
+
+    def __init__(self,
+        func,
+        backend:TorchBackend=None
+    ):
+        # initialize BaseIVPSolver
+        super().__init__(
+            func=func,
+            backend=backend if backend is not None else TorchBackend(
+                precision='double'
+            )
+        )
+
+    def iterate(self,
+        y_0,
+        iterations:int,
+        args
+    ):
+        _Y = self.backend.empty(
+            shape=(iterations + 1, *self.backend.shape(
+                tensor=y_0
+            )),
+            dtype='real'
+        )
+        _Y[0] = y_0
+        for i in range(1, iterations + 1):
+            _Y = self.func(
+                i=i,
+                Y=_Y,
+                args=args
+            )
+
+        return _Y

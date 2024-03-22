@@ -6,71 +6,82 @@
 __name__    = 'quantrl.io'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-12-07"
-__updated__ = "2024-03-01"
+__updated__ = "2024-03-22"
 
 # dependencies
+from copy import deepcopy
+from threading import Thread
 from tqdm import tqdm
 import numpy as np
 import os
 
 # TODO: Implement ConsoleIO
+# TODO: Add ``load_parts`` method
 
 class FileIO(object):
     """Handler for file input-output.
 
-    Initializes ``cache_in_parts``, ``cache`` and ``index``.
-    The parent needs to implement the ``close`` method to disk cache the final file.
+    Initializes ``cache`` to ``None`` and ``index`` to ``-1``.
+    Subsequent calls to ``update_cache`` allocates ``cache`` and updates ``index``.
+    The parent needs to implement the ``close`` method to cache the final file.
 
     Parameters
     ----------
-    data_shape: int
-        Shape of each data element.
     disk_cache_dir: str
         Directory path for the disk cache. If the value of ``disk_cache_size`` is ``0``, the then this parameter serves as the file path for a single disk cache, else the cache is dumped in parts.
-    disk_cache_size: int, default=100
-        Maximum number of data points to cache in memory before dumping to disk. If ``0``, the cache is dumped to a single file.
+    cache_dump_interval: int, default=100
+        Number of steps to update the cache before dumping it to disk. Should be a positive integer.
     """
 
     def __init__(self,
-        data_shape:int,
         disk_cache_dir:str,
-        disk_cache_size:int=100
+        cache_dump_interval:int=100
     ):
         """Class constructor for FileIO."""
 
         # set attributes
-        self.data_shape = data_shape
+        assert type(cache_dump_interval) is int and cache_dump_interval > 0, "parameter ``disk_cache_size`` should be a positive integer"
         self.disk_cache_dir = disk_cache_dir
-        self.disk_cache_size = disk_cache_size
-        self.cache_in_parts = False if self.disk_cache_size == 0 else True
+        self.cache_dump_interval = cache_dump_interval
         try:
-            os.makedirs(self.disk_cache_dir if self.cache_in_parts else self.disk_cache_dir[:self.disk_cache_dir.rfind('/')], exist_ok=True)
+            os.makedirs(self.disk_cache_dir, exist_ok=True)
         except OSError:
             pass
 
         # initialize variables
-        self.cache = np.zeros((self.disk_cache_size, *self.data_shape), dtype=np.float_)
+        self.cache = None
         self.index = -1
 
-    def disk_cache(self,
-        data,
-        batch_idx:int
+    def dump_part(self,
+        data:np.ndarray,
+        batch_idx:int,
+        part_idx:int
     ):
         """Method to dump a batch of data to disk.
 
         Parameters
         ----------
-        data: :class:`numpy.ndarray` or list
+        data: :class:`numpy.ndarray`
             Data to dump.
         batch_idx: int
             Index of the batch.
+        part_idx: int
+            Index of the part.
         """
 
-        # save as compressed NumPy data
-        np.savez_compressed((self.disk_cache_dir  + '/' + str(batch_idx * self.disk_cache_size) + '_' + str((batch_idx + 1) * self.disk_cache_size - 1) + '.npz'), np.array(data))
+        # save as compressed NumPy data from another thread
+        thread = Thread(target=np.savez_compressed, args=(self.disk_cache_dir  + '/' + '_'.join([
+            str(batch_idx * self.cache_dump_interval),
+            str((batch_idx + 1) * self.cache_dump_interval - 1),
+            str(part_idx)
+        ]) + '.npz', data))
+        thread.start()
+
+        # clear cache
+        del data
 
     def update_cache(self,
-        data
+        data:np.ndarray
     ):
         """Method to update the cache with data.
 
@@ -81,13 +92,16 @@ class FileIO(object):
         """
 
         # update list
+        if self.cache is None:
+            self.cache = np.zeros((self.cache_dump_interval, *data.shape), dtype=np.float_)
+
         self.index += 1
-        self.cache[self.index % self.disk_cache_size] = data
+        self.cache[self.index % self.cache_dump_interval] = data
 
         # dump cache
-        if self.cache_in_parts and self.index != 0 and (self.index + 1) % self.disk_cache_size == 0:
+        if self.index != 0 and (self.index + 1) % self.cache_dump_interval == 0:
             self._dump_cache(
-                idx_start=self.index - self.disk_cache_size + 1,
+                idx_start=self.index - self.cache_dump_interval + 1,
                 idx_end=self.index
             )
 
@@ -105,12 +119,13 @@ class FileIO(object):
             Ending index for the part file.
         """
 
-        # save as compressed NumPy data
-        np.savez_compressed((self.disk_cache_dir + '/' + str(idx_start) + '_' + str(idx_end) + '.npz') if self.cache_in_parts else (self.disk_cache_dir + '.npz'), self.cache)
+        # save as compressed NumPy data from another thread
+        thread = Thread(target=np.savez_compressed, args=(self.disk_cache_dir + '/' + str(idx_start) + '_' + str(idx_end) + '.npz', self.cache))
+        thread.start()
 
-        # reset cache
+        # clear cache
         del self.cache
-        self.cache = np.zeros((self.disk_cache_size, *self.data_shape), dtype=np.float_)
+        self.cache = None
 
     def get_disk_cache(self,
         idx_start:int=0,
@@ -125,36 +140,31 @@ class FileIO(object):
             Starting index for the part file.
         idx_end: int, default=-1
             Ending index for the part file.
-        idxs: list, default=None
+        idxs: list or slice, default=None
             Indices of the data values required. If ``None``, all data is returned.
         """
 
-        # single cache file
-        if not self.cache_in_parts:
-            return self._load_cache(
-                idx_start=0,
-                idx_end=-1
-            )[idx_start:idx_end]
-
-        # if cached in parts
+        # iterate over parts
         self.cache_list = list()
         for i in tqdm(
-            range(int(idx_start / self.disk_cache_size) * self.disk_cache_size, idx_end + 1, self.disk_cache_size),
+            range(int(idx_start / self.cache_dump_interval) * self.cache_dump_interval, idx_end + 1, self.cache_dump_interval),
             desc="Loading",
             leave=False,
             mininterval=0.5,
             disable=False
         ):
             # update end index
-            _idx_e = i + self.disk_cache_size - 1
+            _idx_e = i + self.cache_dump_interval - 1
             # update cache list
             _cache = self._load_cache(
                 idx_start=i,
                 idx_end=_idx_e
             )
-            self.cache_list += [_cache[:, :, idxs] if idxs is not None else _cache]
+            self.cache_list += [deepcopy(_cache[:, :, idxs]) if idxs is not None else deepcopy(_cache)]
+            # clear loaded cache
+            del _cache
 
-        return np.concatenate(self.cache_list)[idx_start % self.disk_cache_size:]
+        return np.concatenate(self.cache_list)[idx_start % self.cache_dump_interval:]
 
     def _load_cache(self,
         idx_start:int,
@@ -171,7 +181,7 @@ class FileIO(object):
         """
 
         # load part or single cache file
-        return np.load((self.disk_cache_dir + '/' + str(idx_start) + '_' + (str(idx_end) if idx_end != -1 else '*') + '.npz') if self.cache_in_parts else (self.disk_cache_dir + '.npz'))['arr_0']
+        return np.load(self.disk_cache_dir + '/' + str(idx_start) + '_' + (str(idx_end) if idx_end != -1 else '*') + '.npz')['arr_0']
 
     def close(self,
         dump_cache=True
@@ -184,20 +194,12 @@ class FileIO(object):
             Option to dump the cache.
         """
 
-        if dump_cache:
-            # if single cache file
-            if not self.cache_in_parts:
-                self._dump_cache(
-                    idx_start=None,
-                    idx_end=None
-                )
-            # else cache final part
-            else:
-                _idx_s = self.index - (self.index + 1) % self.disk_cache_size + 1
-                self._dump_cache(
-                    idx_start=_idx_s,
-                    idx_end=_idx_s + self.disk_cache_size - 1
-                )
+        if dump_cache and self.cache is not None:
+            _idx_s = self.index - (self.index + 1) % self.cache_dump_interval + 1
+            self._dump_cache(
+                idx_start=_idx_s,
+                idx_end=_idx_s + self.cache_dump_interval - 1
+            )
 
         # clean
         del self

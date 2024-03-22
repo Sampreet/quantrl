@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.stochastic'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-03-18"
+__updated__ = "2024-03-22"
 
 # dependencies
 import numpy as np
@@ -28,7 +28,7 @@ class LinearEnv(BaseGymEnv):
     Additionally, the ``get_properties`` method should be overridden if ``n_properties`` is non-zero.
     Refer to **Notes** of :class:`quantrl.envs.base.BaseEnv` for their implementations.
 
-    The ``_update_observations`` method requires ``get_A`` for the Jacobian of the observations and the ``get_noise`` for the noise values.
+    The ``func`` method requires ``get_A`` for the Jacobian of the observations and the ``get_noise_prefixes`` for the noise values.
 
     Parameters
     ----------
@@ -54,6 +54,8 @@ class LinearEnv(BaseGymEnv):
         Maximum values of each action.
     action_interval: int
         Interval at which the actions are updated. Must be positive.
+    data_idxs: list
+        Indices of the data to store into the ``data`` attribute. The indices can be selected from the complete set of values at each point of time (total ``1 + n_actions + n_observations + n_properties + 1`` elements in the same order, where the first element is the time and the last element is the reward).
     backend_library: str, default='numpy'
         Solver to use for each step. Options are ``'torch'`` for PyTorch-based solvers, ``'jax'`` for JAX-based solvers and ``'numpy'`` for NumPy/SciPy-based solvers.
     backend_precision: str, default='double'
@@ -68,6 +70,11 @@ class LinearEnv(BaseGymEnv):
 
     default_params = dict()
     """dict: Default parameters of the environment."""
+
+    default_solver_params = dict(
+        seed=None
+    )
+    """dict: Default parameters of the solver."""
 
     backend_libraries = ['torch', 'jax', 'numpy']
     """list: Available backend libraries."""
@@ -84,6 +91,7 @@ class LinearEnv(BaseGymEnv):
         n_actions:int,
         action_maximums:list,
         action_interval:int,
+        data_idxs:list,
         backend_library:str='numpy',
         backend_precision:str='double',
         backend_device:str='cuda',
@@ -98,17 +106,20 @@ class LinearEnv(BaseGymEnv):
         # select backend
         if 'torch' in backend_library:
             from ..backends.torch import TorchBackend
+            from ..solvers.torch import TorchIterativeSolver as IterativeSolver
             backend = TorchBackend(
                 precision=backend_precision,
                 device=backend_device
             )
         elif 'jax' in backend_library:
             from ..backends.jax import JaxBackend
+            from ..solvers.jax import JaxIterativeSolver as IterativeSolver
             backend = JaxBackend(
                 precision=backend_precision
             )
         else:
             from ..backends.numpy import NumPyBackend
+            from ..solvers.numpy import NumPyIterativeSolver as IterativeSolver
             backend = NumPyBackend(
                 precision=backend_precision
             )
@@ -121,6 +132,9 @@ class LinearEnv(BaseGymEnv):
         self.params = dict()
         for key in self.default_params:
             self.params[key] = params.get(key, self.default_params[key])
+        # update keyword arguments
+        for key in self.default_solver_params:
+            kwargs[key] = kwargs.get(key, self.default_solver_params[key])
         # set matrices
         self.I = backend.eye(
             rows=n_observations,
@@ -144,6 +158,7 @@ class LinearEnv(BaseGymEnv):
             n_actions=n_actions,
             action_maximums=action_maximums,
             action_interval=action_interval,
+            data_idxs=data_idxs,
             dir_prefix=(dir_prefix if dir_prefix != 'data' else ('data/' + self.name.lower()) + '/env') + '_' + '_'.join([
                 str(self.params[key]) for key in self.params
             ]),
@@ -152,7 +167,18 @@ class LinearEnv(BaseGymEnv):
         )
 
         # initialize solver
-        self.seeds = np.random.default_rng().integers(low=0, high=1000, size=self.shape_T, endpoint=False, dtype=np.int32)
+        self.seed = kwargs['seed']
+        self.seeds = self.backend.integers(
+            generator=self.backend.generator(self.seed),
+            shape=(self.action_steps, ),
+            low=0,
+            high=1000,
+            dtype='integer'
+        )
+        self.solver = IterativeSolver(
+            func=self.func,
+            backend=self.backend
+        )
 
         # initialize buffers
         self.matmul_0 = self.backend.empty(
@@ -161,55 +187,77 @@ class LinearEnv(BaseGymEnv):
         )
 
     def _update_observations(self):
-        # frequently used variables
-        _shape = self.backend.shape(
-            tensor=self.T_step
-        )
         self.Ws = self.backend.normal(
-            shape=_shape,
+            generator=self.backend.generator(
+                seed=int(self.seeds[self.action_idx]) if self.seed is not None else None
+            ),
+            shape=(self.action_interval + 1, ),
             mean=0.0,
-            std=np.sqrt(self.t_norm_ssz),
-            seed=int(self.seeds[self.t_idx]),
+            std=np.sqrt(self.t_ssz),
             dtype='real'
         )
+        
+        return self.solver.iterate(
+            y_0=self.Observations[-1],
+            iterations=self.backend.shape(
+                tensor=self.T_step
+            )[0] - 1,
+            args=(self.actions, None, None)
+        )
+    
+    def func(self,
+        i,
+        Y,
+        args:tuple
+    ):
+        """Method to obtain the rates of change of the real-valued variables.
 
-        # increment observations
-        Observations = tuple()
-        Observations += (self.Observations[-1] + 0.0, )
-        for i in range(1, _shape[0]):
-            # get drift matrix
-            M_i = self.I + self.get_A(
-                t=self.T_norm[self.t_idx + i],
-                args=[self.actions, None, None]
-            ) * self.t_norm_ssz
-            # get noise prefixes
-            n_i = self.get_noise_prefixes(
-                t=self.T_norm[self.t_idx + i],
-                args=[self.actions, None, None]
-            )
-            # update observations
-            Observations += (self.backend.matmul(
+        Parameters
+        ----------
+        i: int
+            Index of the iteration.
+        y: Any
+            Real-valued variables.
+        args: tuple
+            Actions, control function and delay function.
+
+        Returns
+        -------
+        rates: Any
+            Rates of change of the real-valued modes and flattened correlations with shape ``(2 * num_modes + num_corrs, )``.
+        """
+
+        # get drift matrix
+        M_i = self.I + self.get_A(
+            t_idx=self.t_idx + i,
+            args=args
+        ) * self.t_ssz
+        # get noise prefixes
+        n_i = self.get_noise_prefixes(
+            t_idx=self.t_idx + i,
+            args=args
+        )
+        # update observations
+        return self.backend.update(
+            tensor=Y,
+            indices=i,
+            values=self.backend.matmul(
                 tensor_0=M_i,
-                tensor_1=Observations[i - 1],
-                out=self.matmul_0
-            ) + n_i * self.Ws[i], )
-
-        return self.backend.stack(
-            tensors=Observations,
-            axis=0,
-            out=self.Observations
+                tensor_1=Y[i - 1],
+                out=None
+            ) + n_i * self.Ws[i]
         )
 
     def get_A(self,
-        t,
-        args
+        t_idx:int,
+        args:tuple
     ):
         """Method to obtain the Jacobian of the observations.
 
         Parameters
         ----------
-        t: float
-            Time at which the values are calculated.
+        t_idx: int
+            Index of the time at which the values are calculated.
         args: tuple
             Actions, control function and delay function.
 
@@ -222,15 +270,15 @@ class LinearEnv(BaseGymEnv):
         raise NotImplementedError
 
     def get_noise_prefixes(self,
-        t,
-        args
+        t_idx:int,
+        args:tuple
     ):
         """Method to obtain the noise prefixes for each observations.
 
         Parameters
         ----------
-        t: float
-            Time at which the values are calculated.
+        t_idx: int
+            Index of the time at which the values are calculated.
         args: tuple
             Actions, control function and delay function.
 

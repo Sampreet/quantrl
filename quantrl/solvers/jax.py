@@ -6,7 +6,7 @@
 __name__    = 'quantrl.solvers.jax'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-03-17"
+__updated__ = "2024-03-22"
 
 # dependencies
 import jax
@@ -14,9 +14,10 @@ import diffrax as dfx
 
 # quantrl modules
 from ..backends.jax import JaxBackend
-from .base import BaseIVPSolver
+from .base import BaseIVPSolver, BaseIterativeSolver
 
-# TODO: Implement interpolation
+# TODO: Implement interpole
+# TODO: Implement iterate
 
 class DiffraxIVPSolver(BaseIVPSolver):
     """ODE and DDE solver using Diffrax-based methods for initial-value problems.
@@ -31,7 +32,7 @@ class DiffraxIVPSolver(BaseIVPSolver):
 
     def __init__(self,
         func,
-        y0,
+        y_0,
         T,
         solver_params:dict,
         func_controls=None,
@@ -42,13 +43,13 @@ class DiffraxIVPSolver(BaseIVPSolver):
     ):
         # initialize BaseIVPSolver
         super().__init__(
-            func=func,
-            y0=y0,
+            func=jax.jit(func),
+            y_0=y_0,
             T=T,
             solver_params=solver_params,
-            func_controls=func_controls,
+            func_controls=jax.jit(func_controls) if func_controls is not None else None,
             has_delay=has_delay,
-            func_delay=func_delay,
+            func_delay=jax.jit(func_delay) if func_delay is not None else None,
             delay_interval=delay_interval,
             backend=backend if backend is not None else JaxBackend(
                 precision='double'
@@ -56,7 +57,7 @@ class DiffraxIVPSolver(BaseIVPSolver):
         )
 
         # initialize solver
-        self.term = dfx.ODETerm(jax.jit(self.func))
+        self.term = dfx.ODETerm(self.func)
         self.solver = {
             'dopri5': dfx.Dopri5,
             'dopri8': dfx.Dopri8,
@@ -64,13 +65,13 @@ class DiffraxIVPSolver(BaseIVPSolver):
         }.get(self.solver_params['method'], dfx.Dopri5)()
 
     def integrate(self,
-        y0,
         T_step,
+        y_0,
         params=None
     ):
         # convert to tensor
-        y0 = self.get_tensor(
-            array=y0
+        y_0 = self.backend.convert_to_typed(
+            tensor=y_0
         )
     
         # integrate
@@ -80,7 +81,7 @@ class DiffraxIVPSolver(BaseIVPSolver):
             t0=T_step[0],
             t1=T_step[-1],
             dt0=T_step[1] - T_step[0],
-            y0=y0,
+            y0=y_0,
             args=[params, self.func_controls, self.func_delay],
             saveat=dfx.SaveAt(ts=T_step),
             stepsize_controller=dfx.PIDController(
@@ -90,6 +91,51 @@ class DiffraxIVPSolver(BaseIVPSolver):
         ).ys
     
     def interpolate(self,
-        T, Y
+        T_step,
+        Y
     ):
         raise NotImplementedError
+
+class JaxIterativeSolver(BaseIterativeSolver):
+    """Iteratively solve using JAX.
+
+    Refer to :class:`quantrl.backends.base.BaseIterativeSolver` for its implementation.
+    """
+
+    def __init__(self,
+        func,
+        backend:JaxBackend=None
+    ):
+        # initialize BaseIVPSolver
+        
+        super().__init__(
+            func=lambda i, state: (func(i, *state), *state[1:]),
+            backend=backend if backend is not None else JaxBackend(
+                precision='double'
+            )
+        )
+
+    def iterate(self,
+        y_0,
+        iterations:int,
+        args
+    ):
+        _Y = self.backend.empty(
+            shape=(iterations + 1, *self.backend.shape(
+                tensor=y_0
+            )),
+            dtype='real'
+        )
+        _Y = self.backend.update(
+            tensor=_Y,
+            indices=(0, slice(None)),
+            values=y_0
+        )
+        # _Y, _ = jax.lax.fori_loop(0, iterations + 1, self.func, (_Y, args))
+        for i in range(1, iterations + 1):
+            _Y, _ = self.func(
+                i=i,
+                state=(_Y, args)
+            )
+
+        return _Y

@@ -6,7 +6,7 @@
 __name__    = 'quantrl.solvers.numpy'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-03-15"
+__updated__ = "2024-03-22"
 
 # dependencies
 from scipy.interpolate import splev, splrep
@@ -14,7 +14,7 @@ import scipy.integrate as si
 
 # quantrl modules
 from ..backends.numpy import NumPyBackend
-from .base import BaseIVPSolver
+from .base import BaseIVPSolver, BaseIterativeSolver
 
 class SciPyIVPSolver(BaseIVPSolver):
     """ODE and DDE solver using SciPy-based methods for initial-value problems.
@@ -33,7 +33,7 @@ class SciPyIVPSolver(BaseIVPSolver):
 
     def __init__(self,
         func,
-        y0,
+        y_0,
         T,
         solver_params:dict,
         func_controls=None,
@@ -45,7 +45,7 @@ class SciPyIVPSolver(BaseIVPSolver):
         # initialize BaseIVPSolver
         super().__init__(
             func=func,
-            y0=y0,
+            y_0=y_0,
             T=T,
             solver_params=solver_params,
             func_controls=func_controls,
@@ -60,12 +60,16 @@ class SciPyIVPSolver(BaseIVPSolver):
         # flatten function for integration
         self.func_flat = self.func
         self.is_y_flat = True
-        if len(self.shape_y0) > 1:
+        if len(self.shape_y) > 1:
             self.func_flat = lambda t, y, args: self.backend.flatten(
-                tensor=self.func(t, self.backend.reshape(
-                    tensor=y,
-                    shape=self.shape_y0
-                ), args)
+                tensor=self.func(
+                    t=t,
+                    y=self.backend.reshape(
+                        tensor=y,
+                        shape=self.shape_y
+                    ),
+                    args=args
+                )
             )
             self.is_y_flat = False
 
@@ -81,25 +85,25 @@ class SciPyIVPSolver(BaseIVPSolver):
             )
 
     def integrate(self,
-        y0,
         T_step,
+        y_0,
         params=None
     ):
         # convert to tensor
-        y0 = self.get_tensor(
-            array=y0
+        y_0 = self.backend.convert_to_typed(
+            tensor=y_0
         )
 
         # flatten
-        y0_flat = y0
+        y_0_flat = y_0
         if not self.is_y_flat:
-            y0_flat = self.backend.flatten(
-                tensor=y0
+            y_0_flat = self.backend.flatten(
+                tensor=y_0
             )
 
         # integrate
         _Y_flat = self.integrate_flat(
-            y0_flat=y0_flat,
+            y_0_flat=y_0_flat,
             T_step=T_step,
             args=[params, self.func_controls, self.func_delay]
         )
@@ -107,23 +111,47 @@ class SciPyIVPSolver(BaseIVPSolver):
         # reshape
         return self.backend.reshape(
             tensor=_Y_flat,
-            shape=(len(T_step), *self.shape_y0)
+            shape=(len(T_step), *self.shape_y)
         )
 
     def integrate_flat(self,
-        y0_flat,
         T_step,
-        args
+        y_0_flat,
+        args:tuple
     ):
+        """Method to take one integration step.
+        
+        Parameters
+        ----------
+        T_step: Any
+            Times at which the results are returned.
+        y_0_flat: Any
+            Flattened initial values of the variables.
+        args: tuple
+            Actions, control function and delay function.
+        
+        Returns
+        -------
+        Y: Any
+            Values of the variables at the given points of time.
+        """
+
         # integrate using FORTRAN-based solvers
         if self.solver_params['method'] in self.scipy_old_methods:
-            _Y_flat = self.get_buffer(
-                tensor_0=T_step,
-                tensor_1=y0_flat
+            _Y_flat = self.backend.empty(
+                shape=(
+                    *self.backend.shape(
+                        tensor=T_step
+                    ),
+                    *self.backend.shape(
+                        tensor=y_0_flat
+                    )
+                ),
+                dtype='real'
             )
-            _Y_flat[0] = y0_flat
+            _Y_flat[0] = y_0_flat
             self.integrator.set_initial_value(
-                y=y0_flat,
+                y=y_0_flat,
                 t=T_step[0]
             )
             self.integrator.set_f_params(args)
@@ -135,7 +163,7 @@ class SciPyIVPSolver(BaseIVPSolver):
             _Y_flat = self.backend.transpose(
                 tensor=si.solve_ivp(
                     fun=self.func_flat,
-                    y0=y0_flat,
+                    y0=y_0_flat,
                     t_span=[T_step[0], T_step[-1]],
                     t_eval=T_step,
                     method=self.solver_params['method'],
@@ -148,12 +176,50 @@ class SciPyIVPSolver(BaseIVPSolver):
         return _Y_flat
     
     def interpolate(self,
-        T, Y
+        T_step,
+        Y
     ):
         _shape = self.backend.shape(
             tensor=Y
         )[1]
-        b_spline = [splrep(T, Y[:, j]) for j in range(_shape)]
-        return lambda t: self.get_tensor(
-            array=[splev(t, b_spline[j]) for j in range(_shape)]
+        b_spline = [splrep(T_step, Y[:, j]) for j in range(_shape)]
+        return lambda t: [splev(t, b_spline[j]) for j in range(_shape)]
+
+class NumPyIterativeSolver(BaseIterativeSolver):
+    """Iteratively solve using NumPy.
+
+    Refer to :class:`quantrl.backends.base.BaseIterativeSolver` for its implementation.
+    """
+
+    def __init__(self,
+        func,
+        backend:NumPyBackend=None
+    ):
+        # initialize BaseIVPSolver
+        super().__init__(
+            func=func,
+            backend=backend if backend is not None else NumPyBackend(
+                precision='double'
+            )
         )
+
+    def iterate(self,
+        y_0,
+        iterations:int,
+        args
+    ):
+        _Y = self.backend.empty(
+            shape=(iterations + 1, *self.backend.shape(
+                tensor=y_0
+            )),
+            dtype='real'
+        )
+        _Y[0] = y_0
+        for i in range(1, iterations + 1):
+            _Y = self.func(
+                i=i,
+                Y=_Y,
+                args=args
+            )
+
+        return _Y

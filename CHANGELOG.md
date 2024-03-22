@@ -1,5 +1,25 @@
 # Changelog
 
+## 2024/03/22 - 00 - v0.0.7 - Updated FileIO
+* Updated `quantrl.backends` package:
+    * Renamed occurences of ``tensor`` to ``typed`` and ``array`` to ``numpy``.
+    * Renamed ``lib`` attribute to ``library`` for the backend library.
+    * Added ``numpy`` option to ``dtype_from_str`` method.
+    * Added ``is_typed``, ``generator`` and ``integers`` methods.
+* Updated `quantrl.envs` package:
+    * Added ``data_idxs`` option for selective storage.
+    * Renamed ``disk_cache_size`` to ``cache_dump_interval``.
+    * Removed ``preserve_dtype`` option. All backend data-types are now preserved.
+    * Updated default value of ``observation_space_range`` to ``[-1e12, 1e12]`` and added ``check_truncation`` method to check if observations are out of bounds..
+    * Added ``t_ssz`` attribute for the actual step size.
+    * Added dedicated variables for caching, saving and plotting in vectorized environments.
+* Updated `quantrl.io.FileIO` class:
+    * Renamed ``disk_cache_size`` to ``cache_dump_interval``.
+    * Removed option to update cache in parts and added ``dump_part`` method to directly dump part data of batches.
+    * Added threading to support asynchronous cache dump.
+* Templated iterative solvers to `quantrl.solvers` package.
+* Updated `README` and `setup`.
+
 ## 2024/03/18 - 00 - v0.0.6 - PyTorch and JAX Backends
 * Added `quantrl.backends` package:
     * Added abstract base class `BaseBackend` for different backends in `base` module.

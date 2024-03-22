@@ -28,7 +28,8 @@ setup(
         'matplotlib',
         'numpy',
         'scipy',
-        'stable-baselines3'
+        'stable-baselines3',
+        'tqdm'
     ],
     python_requires='>=3.8',
     zip_safe=False,

@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-03-18"
+__updated__ = "2024-03-22"
 
 # dependencies
 from abc import ABC, abstractmethod
@@ -17,7 +17,7 @@ class BaseBackend(ABC):
     
     Parameters
     ----------
-    lib: Any
+    library: Any
         Library used by the backend.
     tensor_type: Any
         Tensor type for the backend.
@@ -26,7 +26,7 @@ class BaseBackend(ABC):
     """
 
     def __init__(self,
-        lib,
+        library,
         tensor_type,
         precision:str='double'
     ):
@@ -34,23 +34,23 @@ class BaseBackend(ABC):
         assert precision in ['single', 'double'], "parameter ``precision`` can be either ``'single'`` or ``'double'``."
 
         # set attributes
-        self.lib = lib
+        self.library = library
         self.tensor_type = tensor_type
         self.precision = precision
         self.dtypes = {
-            'tensor': {
+            'typed': {
                 'single': {
-                    'integer': self.lib.int32,
-                    'real': self.lib.float32,
-                    'complex': self.lib.complex64
+                    'integer': self.library.int32,
+                    'real': self.library.float32,
+                    'complex': self.library.complex64
                 },
                 'double': {
-                    'integer': self.lib.int64,
-                    'real': self.lib.float64,
-                    'complex': self.lib.complex128
+                    'integer': self.library.int64,
+                    'real': self.library.float64,
+                    'complex': self.library.complex128
                 }
             },
-            'array': {
+            'numpy': {
                 'single': {
                     'integer': np.int32,
                     'real': np.float32,
@@ -61,20 +61,47 @@ class BaseBackend(ABC):
                     'real': np.float64,
                     'complex': np.complex128
                 }
-            },
+            }
         }
 
-    @abstractmethod
-    def convert_to_tensor(self,
-        array,
+    def is_typed(self,
+        tensor,
         dtype:str=None
-    ):
-        """Method to obtain a typed tensor from a given array.
+    ) -> bool:
+        """Method to check if a tensor is a typed tensor of given dtype.
         
         Parameters
         ----------
-        array: Any
-            Given array.
+        tensor: Any
+            Given tensor.
+        dtype: str, default=None
+            Broad data-type. Options are ``'integer'``, ``'real'`` and ``'complex'``. If ``None``, the data-type is not checked.
+
+        Returns
+        -------
+        is_typed: bool
+            Whether the tensor is a typed tensor.
+        """
+
+        _dtype = self.dtype_from_str(
+            dtype=dtype
+        )
+        if type(tensor) == self.tensor_type:
+            if dtype is None or (dtype is not None and tensor.dtype == _dtype):
+                return True
+        return False
+
+    @abstractmethod
+    def convert_to_typed(self,
+        tensor,
+        dtype:str=None
+    ):
+        """Method to obtain a typed tensor with given data-type from a numpy array or another typed tensor.
+        
+        Parameters
+        ----------
+        tensor: Any
+            Given tensor.
         dtype: str, default=None
             Broad data-type. Options are ``'integer'``, ``'real'`` and ``'complex'``. If ``None``, the data-type of the original array is returned.
 
@@ -87,7 +114,7 @@ class BaseBackend(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def convert_to_array(self,
+    def convert_to_numpy(self,
         tensor,
         dtype:str=None
     ) -> np.ndarray:
@@ -109,25 +136,75 @@ class BaseBackend(ABC):
         raise NotImplementedError
     
     @abstractmethod
+    def generator(self,
+        seed:int=None
+    ):
+        """Method to obtain a pseudo random number generator.
+
+        Parameters
+        ----------
+        seed: Any, default=None
+            Seed for the PRNG. If ``None``, a random seed is selected in ``[0, 1000)``.
+
+        Returns
+        -------
+        generator: Any
+            Pseudo random number generator.
+        """
+
+        raise NotImplementedError
+    
+    @abstractmethod
+    def integers(self,
+        generator,
+        shape:tuple,
+        low:int=0,
+        high:int=1000,
+        dtype:str=None
+    ):
+        """Method to obtain a typed tensor containing samples from a uniform distribution in the interval ``[low, high)``.
+
+        Parameters
+        ----------
+        generator: Any
+            Pseudo random number generator.
+        shape: tuple
+            Shape of the typed tensor.
+        low: int, default=0
+            Lowest value (inclusive).
+        high: int, default=1000
+            Highest value (exclusive).
+        dtype: str, default=None
+            Broad data-type. Options are ``'integer'``, ``'real'`` and ``'complex'``. the data-type is casted to real.
+
+        Returns
+        -------
+        tensor: Any
+            Typed tensor containing the samples.
+        """
+
+        raise NotImplementedError
+    
+    @abstractmethod
     def normal(self,
+        generator,
         shape:tuple,
         mean:float=0.0,
         std:float=1.0,
-        seed:int=None,
         dtype:str=None
     ):
         """Method to obtain a typed tensor containing samples from a normal distribution.
 
         Parameters
         ----------
+        generator: Any
+            Pseudo random number generator.
         shape: tuple
             Shape of the typed tensor.
         mean: float, default=0.0
             Mean of the distribution.
         std: float, default=1.0
             Standard deviation of the distribution.
-        seed: Any, default=None
-            Seed for the PRNG. If ``None``, a random seed is selected in ``[0, 1000)``.
         dtype: str, default=None
             Broad data-type. Options are ``'integer'``, ``'real'`` and ``'complex'``. the data-type is casted to real.
 
@@ -338,17 +415,17 @@ class BaseBackend(ABC):
         raise NotImplementedError
 
     def dtype_from_str(self,
-        mode:str,
-        dtype:str=None
+        dtype:str=None,
+        numpy:bool=False
     ):
-        """Method to obtain the data-type from a given string.
+        """Method to obtain the data-type from a string.
         
         Parameters
         ----------
-        mode: str
-            Mode of backend. Options are ``'tensor'`` for the selected backend or ``'array'`` for NumPy backend.
         dtype: str, default=None
             Broad data-type. Options are ``'integer'``, ``'real'`` and ``'complex'``. If ``None``, the data-type is casted to real.
+        numpy: bool, default=False
+            Option to use NumPy data-types.
 
         Returns
         -------
@@ -358,13 +435,11 @@ class BaseBackend(ABC):
 
         # validate params
         assert dtype is None or dtype in ['integer', 'real', 'complex'], "parameter ``dtype`` can be either ``'integer'``, ``'real'`` or ``'complex'``."
-        assert mode in ['tensor', 'array'], "parameter ``mode`` can be either ``'tensor'`` or ``'array'``"
         
-        # default dtype is the backend's real data-type
+        # default dtype is the real data-type
         if dtype is None:
-            return self.dtypes[mode][self.precision]['real']
-
-        return self.dtypes[mode][self.precision][dtype]
+            dtype = 'real'
+        return self.dtypes['numpy' if numpy else 'typed'][self.precision][dtype]
 
     def empty(self,
         shape:tuple,
@@ -385,8 +460,7 @@ class BaseBackend(ABC):
             Empty typed tensor.
         """
 
-        return self.lib.empty(shape, dtype=self.dtype_from_str(
-            mode='tensor',
+        return self.library.empty(shape, dtype=self.dtype_from_str(
             dtype=dtype
         ))
 
@@ -409,8 +483,7 @@ class BaseBackend(ABC):
             Typed tensor of zeros.
         """
 
-        return self.lib.zeros(shape, dtype=self.dtype_from_str(
-            mode='tensor',
+        return self.library.zeros(shape, dtype=self.dtype_from_str(
             dtype=dtype
         ))
 
@@ -433,8 +506,7 @@ class BaseBackend(ABC):
             Typed tensor of ones.
         """
 
-        return self.lib.ones(shape, dtype=self.dtype_from_str(
-            mode='tensor',
+        return self.library.ones(shape, dtype=self.dtype_from_str(
             dtype=dtype
         ))
 
@@ -460,8 +532,7 @@ class BaseBackend(ABC):
             Typed identity matrix.
         """
 
-        return self.lib.eye(rows, (cols if cols is not None else rows), dtype=self.dtype_from_str(
-            mode='tensor',
+        return self.library.eye(rows, (cols if cols is not None else rows), dtype=self.dtype_from_str(
             dtype=dtype
         ))
 
@@ -484,8 +555,8 @@ class BaseBackend(ABC):
             Typed diagonal matrix.
         """
 
-        return self.lib.diag(self.convert_to_tensor(
-            array=tensor,
+        return self.library.diag(self.convert_to_typed(
+            tensor=tensor,
             dtype=dtype
         ))
 
@@ -506,7 +577,7 @@ class BaseBackend(ABC):
         ssz: float
             Size of the steps.
         dtype: str, default=None
-            Broad data-type. Options are ``'integer'``, ``'real'`` and ``'complex'``. If ``None``, the data-type is casted to integer (int).
+            Broad data-type. Options are ``'integer'``, ``'real'`` and ``'complex'``. If ``None``, the data-type is casted to integer.
 
         Returns
         -------
@@ -514,8 +585,7 @@ class BaseBackend(ABC):
             Typed tensor of evenly-stepped values.
         """
 
-        return self.lib.arange(start, stop, ssz, dtype=self.dtype_from_str(
-            mode='tensor',
+        return self.library.arange(start, stop, ssz, dtype=self.dtype_from_str(
             dtype=dtype if dtype is not None else 'integer'
         ))
 
@@ -544,8 +614,7 @@ class BaseBackend(ABC):
             Typed tensor of linearly-spaced values.
         """
 
-        return self.lib.linspace(start, stop, dim, dtype=self.dtype_from_str(
-            mode='tensor',
+        return self.library.linspace(start, stop, dim, dtype=self.dtype_from_str(
             dtype=dtype
         ))
 
@@ -565,8 +634,8 @@ class BaseBackend(ABC):
             Shape of the typed tensor.
         """
 
-        return tuple(self.convert_to_tensor(
-            array=tensor
+        return tuple(self.convert_to_typed(
+            tensor=tensor
         ).shape)
 
     def reshape(self,
@@ -588,8 +657,8 @@ class BaseBackend(ABC):
             Typed tensor with given shape.
         """
 
-        return self.convert_to_tensor(
-            array=tensor
+        return self.convert_to_typed(
+            tensor=tensor
         ).reshape(shape)
 
     def flatten(self,
@@ -608,8 +677,8 @@ class BaseBackend(ABC):
             Flattened typed tensor.
         """
 
-        return self.convert_to_tensor(
-            array=tensor
+        return self.convert_to_typed(
+            tensor=tensor
         ).flatten()
 
     def real(self,
@@ -628,8 +697,8 @@ class BaseBackend(ABC):
             Real components of the complex typed tensor.
         """
 
-        return self.lib.real(self.convert_to_tensor(
-            array=tensor
+        return self.library.real(self.convert_to_typed(
+            tensor=tensor
         ))
 
     def imag(self,
@@ -648,8 +717,8 @@ class BaseBackend(ABC):
             Imaginary components of the complex typed tensor.
         """
 
-        return self.lib.imag(self.convert_to_tensor(
-            array=tensor
+        return self.library.imag(self.convert_to_typed(
+            tensor=tensor
         ))
 
     def conj(self,
@@ -668,13 +737,12 @@ class BaseBackend(ABC):
             Complex conjugate of the typed tensor.
         """
 
-        return self.lib.conj(self.convert_to_tensor(
-            array=tensor
+        return self.library.conj(self.convert_to_typed(
+            tensor=tensor
         ))
 
     def min(self,
-        tensor,
-        axis:int=None
+        tensor
     ):
         """Method to obtain the minimum value(s) of a typed tensor along an axis.
         
@@ -682,8 +750,6 @@ class BaseBackend(ABC):
         ----------
         tensor: Any
             Given typed tensor.
-        axis: int, default=None
-            Axis along which the minimum value(s) is(are) obtained. If ``None``, the minimum value of the complete tensor is returned.
 
         Returns
         -------
@@ -691,13 +757,12 @@ class BaseBackend(ABC):
             Minimum value(s) of the typed tensor along the given axis.
         """
 
-        return self.lib.min(self.convert_to_tensor(
-            array=tensor
-        ), axis)
+        return self.library.min(self.convert_to_typed(
+            tensor=tensor
+        ))
 
     def max(self,
-        tensor,
-        axis:int=None
+        tensor
     ):
         """Method to obtain the maximum value(s) of a typed tensor along an axis.
         
@@ -705,8 +770,6 @@ class BaseBackend(ABC):
         ----------
         tensor: Any
             Given typed tensor.
-        axis: int, default=None
-            Axis along which the maximum value(s) is(are) obtained. If ``None``, the maximum value of the complete tensor is returned.
 
         Returns
         -------
@@ -714,6 +777,6 @@ class BaseBackend(ABC):
             Maximum value(s) of the typed tensor along the given axis.
         """
 
-        return self.lib.max(self.convert_to_tensor(
-            array=tensor
-        ), axis)
+        return self.library.max(self.convert_to_typed(
+            tensor=tensor
+        ))
