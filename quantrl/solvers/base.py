@@ -6,7 +6,7 @@
 __name__    = 'quantrl.solvers.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-03-20"
+__updated__ = "2024-03-23"
 
 # dependencies
 from abc import ABC, abstractmethod
@@ -248,25 +248,3 @@ class BaseIVPSolver(ABC):
             )[1:]
 
         return Y
-
-class BaseIterativeSolver(ABC):
-    def __init__(self,
-        func,
-        backend:BaseBackend
-    ):
-        """Class constructor for BaseIterativeSolver."""
-
-        # set attributes
-        self.func = func
-        self.backend = backend
-
-    @abstractmethod
-    def iterate(self,
-        t_idx_0:int,
-        y_0,
-        iterations:int,
-        args
-    ):
-        """"""
-
-        raise NotImplementedError

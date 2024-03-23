@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.numpy'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-03-22"
+__updated__ = "2024-03-23"
 
 # dependencies
 import numpy as np
@@ -143,3 +143,13 @@ class NumPyBackend(BaseBackend):
     ) -> np.ndarray:
         tensor[indices] = values
         return tensor
+
+    def iterate_i(self,
+        func,
+        iterations_i:int,
+        Y,
+        args:tuple=None
+    ):
+        for i in range(iterations_i):
+            Y = func(i, Y, args)
+        return Y

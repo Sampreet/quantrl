@@ -6,7 +6,7 @@
 __name__    = 'quantrl.solvers.numpy'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-03-22"
+__updated__ = "2024-03-23"
 
 # dependencies
 from scipy.interpolate import splev, splrep
@@ -14,7 +14,7 @@ import scipy.integrate as si
 
 # quantrl modules
 from ..backends.numpy import NumPyBackend
-from .base import BaseIVPSolver, BaseIterativeSolver
+from .base import BaseIVPSolver
 
 class SciPyIVPSolver(BaseIVPSolver):
     """ODE and DDE solver using SciPy-based methods for initial-value problems.
@@ -184,42 +184,3 @@ class SciPyIVPSolver(BaseIVPSolver):
         )[1]
         b_spline = [splrep(T_step, Y[:, j]) for j in range(_shape)]
         return lambda t: [splev(t, b_spline[j]) for j in range(_shape)]
-
-class NumPyIterativeSolver(BaseIterativeSolver):
-    """Iteratively solve using NumPy.
-
-    Refer to :class:`quantrl.backends.base.BaseIterativeSolver` for its implementation.
-    """
-
-    def __init__(self,
-        func,
-        backend:NumPyBackend=None
-    ):
-        # initialize BaseIVPSolver
-        super().__init__(
-            func=func,
-            backend=backend if backend is not None else NumPyBackend(
-                precision='double'
-            )
-        )
-
-    def iterate(self,
-        y_0,
-        iterations:int,
-        args
-    ):
-        _Y = self.backend.empty(
-            shape=(iterations + 1, *self.backend.shape(
-                tensor=y_0
-            )),
-            dtype='real'
-        )
-        _Y[0] = y_0
-        for i in range(1, iterations + 1):
-            _Y = self.func(
-                i=i,
-                Y=_Y,
-                args=args
-            )
-
-        return _Y

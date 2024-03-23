@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.stochastic'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-03-22"
+__updated__ = "2024-03-23"
 
 # dependencies
 import numpy as np
@@ -14,7 +14,6 @@ import numpy as np
 # quantrl modules
 from .base import BaseGymEnv
 
-# TODO: Separate iterative solver to support JAX
 # TODO: Add MCQT
 # TODO: Add delay feature
 
@@ -106,20 +105,17 @@ class LinearEnv(BaseGymEnv):
         # select backend
         if 'torch' in backend_library:
             from ..backends.torch import TorchBackend
-            from ..solvers.torch import TorchIterativeSolver as IterativeSolver
             backend = TorchBackend(
                 precision=backend_precision,
                 device=backend_device
             )
         elif 'jax' in backend_library:
             from ..backends.jax import JaxBackend
-            from ..solvers.jax import JaxIterativeSolver as IterativeSolver
             backend = JaxBackend(
                 precision=backend_precision
             )
         else:
             from ..backends.numpy import NumPyBackend
-            from ..solvers.numpy import NumPyIterativeSolver as IterativeSolver
             backend = NumPyBackend(
                 precision=backend_precision
             )
@@ -175,10 +171,6 @@ class LinearEnv(BaseGymEnv):
             high=1000,
             dtype='integer'
         )
-        self.solver = IterativeSolver(
-            func=self.func,
-            backend=self.backend
-        )
 
         # initialize buffers
         self.matmul_0 = self.backend.empty(
@@ -187,21 +179,37 @@ class LinearEnv(BaseGymEnv):
         )
 
     def _update_observations(self):
+        # extract frequently used variables
+        _dim = self.backend.shape(
+            tensor=self.T_step
+        )[0]
+
+        # generate noises
         self.Ws = self.backend.normal(
             generator=self.backend.generator(
                 seed=int(self.seeds[self.action_idx]) if self.seed is not None else None
             ),
-            shape=(self.action_interval + 1, ),
+            shape=(_dim - 1, ),
             mean=0.0,
             std=np.sqrt(self.t_ssz),
             dtype='real'
         )
+
+        # initialize observations
+        _Y = self.backend.update(
+            tensor=self.backend.empty(
+                shape=(self.action_interval + 1, self.n_observations),
+                dtype='real'
+            ),
+            indices=0,
+            values=self.Observations[-1]
+        )
         
-        return self.solver.iterate(
-            y_0=self.Observations[-1],
-            iterations=self.backend.shape(
-                tensor=self.T_step
-            )[0] - 1,
+        # iterate and return
+        return self.backend.iterate_i(
+            func=self.func,
+            iterations_i=_dim - 1,
+            Y=_Y,
             args=(self.actions, None, None)
         )
     
@@ -240,10 +248,10 @@ class LinearEnv(BaseGymEnv):
         # update observations
         return self.backend.update(
             tensor=Y,
-            indices=i,
+            indices=i + 1,
             values=self.backend.matmul(
                 tensor_0=M_i,
-                tensor_1=Y[i - 1],
+                tensor_1=Y[i],
                 out=None
             ) + n_i * self.Ws[i]
         )

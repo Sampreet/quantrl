@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-03-22"
+__updated__ = "2024-03-23"
 
 # dependencies
 from abc import ABC, abstractmethod
@@ -805,6 +805,7 @@ class BaseGymEnv(BaseEnv, Env):
         del _data_backend, _tensors, _Ts_step, _actions, _Rewards
 
     def evolve(self,
+        show_progress=True,
         close=True
     ):
         """Method to freely evolve the trajectory.
@@ -824,7 +825,7 @@ class BaseGymEnv(BaseEnv, Env):
             desc="Evolving",
             leave=True,
             mininterval=0.5,
-            disable=False
+            disable=not show_progress
         ):
             # set actions
             self.actions = self.action_maximums
@@ -1252,6 +1253,7 @@ class BaseSB3Env(BaseEnv, VecEnv):
             del _Properties
 
     def evolve(self,
+        show_progress=True,
         close=True,
         save=False
     ):
@@ -1274,7 +1276,7 @@ class BaseSB3Env(BaseEnv, VecEnv):
             desc="Evolving",
             leave=True,
             mininterval=0.5,
-            disable=False
+            disable=not show_progress
         ):
             # set actions
             self.actions = self.action_maximums_batch

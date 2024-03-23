@@ -6,9 +6,10 @@
 __name__    = 'quantrl.backends.jax'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-03-22"
+__updated__ = "2024-03-23"
 
 # dependencies
+from inspect import getfullargspec
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -39,6 +40,7 @@ class JaxBackend(BaseBackend):
             axis_0:int=None,
             axis_1:int=None
         ):
+            # get swapped axes
             _shape = self.shape(
                 tensor=tensor
             )
@@ -223,3 +225,21 @@ class JaxBackend(BaseBackend):
         values
     ) -> jxe.ArrayImpl:
         return jax.block_until_ready(tensor.at[indices].set(values))
+
+    def iterate_i(self,
+        func,
+        iterations_i:int,
+        Y,
+        args:tuple=None
+    ) -> jxe.ArrayImpl:
+        # convert to comapatible function
+        _func_args = getfullargspec(func).args
+        if (_func_args[0] == 'self' and len(_func_args) > 3) or len(_func_args) > 2:
+            body_func = lambda i, state: (func(i, *state), *state[1:])
+        else:
+            body_func = func
+
+        # loop and return typed tensor
+        return jax.block_until_ready(jax.lax.fori_loop(0, iterations_i, body_func, (self.convert_to_typed(
+            tensor=Y
+        ), args))[0])

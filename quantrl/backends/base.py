@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-03-22"
+__updated__ = "2024-03-23"
 
 # dependencies
 from abc import ABC, abstractmethod
@@ -410,6 +410,34 @@ class BaseBackend(ABC):
         -------
         tensor: Any
             Updated typed tensor.
+        """
+
+        raise NotImplementedError
+
+    @abstractmethod
+    def iterate_i(self,
+        func,
+        iterations_i:int,
+        Y,
+        args:tuple=None
+    ):
+        """Method to iterate over a single variable.
+        
+        Parameters
+        ----------
+        func: callable
+            Function to iterate formatted as ``func(i, *args, *kwargs)``, where i is the index of the iteration.
+        iterations_i: int
+            Number of iterations in the first variable. This results in interation indices in the open interval ``[0, iterations_i)``.
+        Y: Any
+            The tensor which is updated at each iteration, with ``Y[0]`` containing the initial values.
+        args: tuple
+            Arguments for the iteration.
+
+        Returns
+        -------
+        Y: Any
+            Updated tensor.
         """
 
         raise NotImplementedError

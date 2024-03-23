@@ -1,5 +1,11 @@
 # Changelog
 
+## 2024/03/23 - 00 - v0.0.7 - Updated Stochastic Environment
+* Added ``iterate_i`` method to support single loops in `quantrl.backends` package.
+* Updated ``quantrl.envs.stochastic.LinearEnv`` with support for JAX loops.
+* Removed iterative solvers from `quantrl.solvers` package.
+* Updated `README` and `setup`.
+
 ## 2024/03/22 - 00 - v0.0.7 - Updated FileIO
 * Updated `quantrl.backends` package:
     * Renamed occurences of ``tensor`` to ``typed`` and ``array`` to ``numpy``.
