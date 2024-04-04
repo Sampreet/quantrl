@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.stochastic'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-03-23"
+__updated__ = "2024-04-04"
 
 # dependencies
 import numpy as np
@@ -16,6 +16,7 @@ from .base import BaseGymEnv
 
 # TODO: Add MCQT
 # TODO: Add delay feature
+# TODO: Release memory
 
 class LinearEnv(BaseGymEnv):
     """Class to interface stochastic linear environments using Wiener increments.
@@ -23,11 +24,11 @@ class LinearEnv(BaseGymEnv):
     Initializes ``A`` and ``is_A_constant``.
     The interfaced environment requires ``default_params`` dictionary defined before initializing the parent class.
 
-    The interfaced environment needs to implement ``reset_observations`` and ``get_reward`` methods.
+    The interfaced environment needs to implement ``reset_states`` and ``get_reward`` methods.
     Additionally, the ``get_properties`` method should be overridden if ``n_properties`` is non-zero.
     Refer to **Notes** of :class:`quantrl.envs.base.BaseEnv` for their implementations.
 
-    The ``func`` method requires ``get_A`` for the Jacobian of the observations and the ``get_noise_prefixes`` for the noise values.
+    The ``func`` method requires ``get_A`` for the Jacobian of the states and the ``get_noise_prefixes`` for the noise values.
 
     Parameters
     ----------
@@ -101,6 +102,7 @@ class LinearEnv(BaseGymEnv):
 
         # validate arguments
         assert backend_library in self.backend_libraries, "parameter ``solver_type`` should be one of ``{}``".format(self.backend_libraries)
+        assert kwargs['seed'] is None or type(kwargs['seed']) is int, "parameter ``seed`` should be an integer"
 
         # select backend
         if 'torch' in backend_library:
@@ -131,7 +133,7 @@ class LinearEnv(BaseGymEnv):
         # update keyword arguments
         for key in self.default_solver_params:
             kwargs[key] = kwargs.get(key, self.default_solver_params[key])
-        # set matrices
+        # set buffers
         self.I = backend.eye(
             rows=n_observations,
             cols=None,
@@ -161,16 +163,8 @@ class LinearEnv(BaseGymEnv):
             file_prefix='lin_env',
             **kwargs
         )
-
-        # initialize solver
-        self.seed = kwargs['seed']
-        self.seeds = self.backend.integers(
-            generator=self.backend.generator(self.seed),
-            shape=(self.action_steps, ),
-            low=0,
-            high=1000,
-            dtype='integer'
-        )
+        # set noise parameters
+        self.seed = int(kwargs['seed'])
 
         # initialize buffers
         self.matmul_0 = self.backend.empty(
@@ -178,31 +172,41 @@ class LinearEnv(BaseGymEnv):
             dtype='real'
         )
 
-    def _update_observations(self):
-        # extract frequently used variables
-        _dim = self.backend.shape(
-            tensor=self.T_step
-        )[0]
-
-        # generate noises
+    def reset(self,
+        seed:float=None,
+        options:dict=None
+    ):
+        # update Wiener noises
         self.Ws = self.backend.normal(
             generator=self.backend.generator(
-                seed=int(self.seeds[self.action_idx]) if self.seed is not None else None
+                seed=self.seed
             ),
-            shape=(_dim - 1, ),
+            shape=(self.shape_T[0] - 1, self.n_observations),
             mean=0.0,
             std=np.sqrt(self.t_ssz),
             dtype='real'
         )
 
-        # initialize observations
+        # return observations
+        return super().reset(
+            seed=seed,
+            options=options
+        )
+
+    def _update_states(self):
+        # extract frequently used variables
+        _dim = self.backend.shape(
+            tensor=self.T_step
+        )[0]
+
+        # initialize states
         _Y = self.backend.update(
             tensor=self.backend.empty(
                 shape=(self.action_interval + 1, self.n_observations),
                 dtype='real'
             ),
             indices=0,
-            values=self.Observations[-1]
+            values=self.States[-1]
         )
         
         # iterate and return
@@ -245,7 +249,7 @@ class LinearEnv(BaseGymEnv):
             t_idx=self.t_idx + i,
             args=args
         )
-        # update observations
+        # update states
         return self.backend.update(
             tensor=Y,
             indices=i + 1,
@@ -253,14 +257,14 @@ class LinearEnv(BaseGymEnv):
                 tensor_0=M_i,
                 tensor_1=Y[i],
                 out=None
-            ) + n_i * self.Ws[i]
+            ) + n_i * self.Ws[self.t_idx + i]
         )
 
     def get_A(self,
         t_idx:int,
         args:tuple
     ):
-        """Method to obtain the Jacobian of the observations.
+        """Method to obtain the Jacobian of the states.
 
         Parameters
         ----------
@@ -272,7 +276,7 @@ class LinearEnv(BaseGymEnv):
         Returns
         -------
         A: Any
-            Jacobian of the observations with shape ``(n_observations, n_observations)``.
+            Jacobian of the states with shape ``(n_observations, n_observations)``.
         """
 
         raise NotImplementedError
@@ -281,7 +285,7 @@ class LinearEnv(BaseGymEnv):
         t_idx:int,
         args:tuple
     ):
-        """Method to obtain the noise prefixes for each observations.
+        """Method to obtain the noise prefixes for each state.
 
         Parameters
         ----------

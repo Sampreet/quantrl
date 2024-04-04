@@ -1,5 +1,11 @@
 # Changelog
 
+## 2024/04/04 - 00 - v0.0.7 - Added Observation Noise
+* Added option to add standard deviations of the observed states ``Observations`` from the actual states ``States`` through the ``observation_stds`` parameter in the ``reset`` and ``update`` methods.
+* Renamed ``reset_observations`` method to ``reset_states`` to reset the actual states ``States``.
+* Renamed ``_update_observations`` method to ``_update_states`` to update the actual states ``States``.
+* Updated documentation and `README`.
+
 ## 2024/03/23 - 00 - v0.0.7 - Updated Stochastic Environment
 * Added ``iterate_i`` method to support single loops in `quantrl.backends` package.
 * Updated ``quantrl.envs.stochastic.LinearEnv`` with support for JAX loops.
@@ -79,7 +85,6 @@
 * Reversed the sequence of arguments in `quantrl.solvers.differential.SciPyIVPSolver` class.
 * Update tick options in `quantrl.plotter` module.
 * Updated `README` and `setup`.
-
 
 ## 2024/02/10 - 00 - v0.0.3 - Added Wiener Processes
 * Restructured `quantrl.envs.rl` module:

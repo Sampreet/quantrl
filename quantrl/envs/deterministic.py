@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.deterministic'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-03-22"
+__updated__ = "2024-04-03"
 
 # quantrl modules
 from .base import BaseGymEnv, BaseSB3Env
@@ -19,7 +19,7 @@ class LinearizedHOEnv(BaseGymEnv):
     Initializes ``dim_corrs``, ``num_corrs``, ``A``, ``D``, ``is_A_constant``, ``is_D_constant`` and ``solver``.
     The interfaced environment requires ``default_params`` dictionary defined before initializing the parent class.
 
-    The interfaced environment needs to implement ``reset_observations`` and ``get_reward`` methods.
+    The interfaced environment needs to implement ``reset_states`` and ``get_reward`` methods.
     Additionally, the ``get_properties`` method should be overridden if ``n_properties`` is non-zero.
     Refer to **Notes** of :class:`quantrl.envs.base.BaseEnv` for their implementations.
     The default ``func`` method can be used to call ``get_mode_rates`` for rates of change of the classical mode amplitudes, ``get_A`` for the Jacobian of the quantum fluctuation quadratures and ``get_D`` for the quantum noise correlations by overriding the corresponding methods.
@@ -179,7 +179,7 @@ class LinearizedHOEnv(BaseGymEnv):
         # initialize solver
         self.solver = IVPSolverClass(
             func=self.func,
-            y_0=self.Observations[-1],
+            y_0=self.States[-1],
             T=self.T,
             solver_params={
                 'method': kwargs['ode_method'],
@@ -223,10 +223,10 @@ class LinearizedHOEnv(BaseGymEnv):
             dtype='real'
         )
 
-    def _update_observations(self):
+    def _update_states(self):
         return self.solver.step(
             T_step=self.T_step,
-            y_0=self.Observations[-1],
+            y_0=self.States[-1],
             params=self.actions
         )
 
@@ -453,7 +453,7 @@ class LinearizedHOVecEnv(BaseSB3Env):
     For massively parallel models, the ``data_idxs`` parameter should be carefully selected to initialize the ``data`` attribute with shape ``(n_envs, t_dim, n_data_idxs)``.
     In such cases, it is advisable to use the JAX backend with the ``cache_all_data`` paramter to ``False``.
 
-    The interfaced environment needs to implement ``reset_observations`` and ``get_reward`` methods.
+    The interfaced environment needs to implement ``reset_states`` and ``get_reward`` methods.
     Additionally, the ``get_properties`` method should be overridden if ``n_properties`` is non-zero.
     Refer to **Notes** of :class:`quantrl.envs.base.BaseEnv` for their implementations.
     The default ``func`` method can be used to call ``get_mode_rates`` for rates of change of the classical mode amplitudes, ``get_A`` for the Jacobian of the quantum fluctuation quadratures and ``get_D`` for the quantum noise correlations by overriding the corresponding methods.
@@ -617,7 +617,7 @@ class LinearizedHOVecEnv(BaseSB3Env):
         # initialize solver
         self.solver = IVPSolverClass(
             func=self.func,
-            y_0=self.Observations[-1],
+            y_0=self.States[-1],
             T=self.T,
             solver_params={
                 'method': kwargs['ode_method'],
@@ -661,10 +661,10 @@ class LinearizedHOVecEnv(BaseSB3Env):
             dtype='real'
         )
 
-    def _update_observations(self):
+    def _update_states(self):
         return self.solver.step(
             T_step=self.T_step,
-            y_0=self.Observations[-1],
+            y_0=self.States[-1],
             params=self.actions
         )
 

@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-03-23"
+__updated__ = "2024-04-04"
 
 # dependencies
 from abc import ABC, abstractmethod
@@ -29,7 +29,7 @@ class BaseEnv(ABC):
 
     Initializes ``T_norm``, ``T``, ``observation_space``, ``action_space``, ``action_steps``, ``file_path_prefix``, ``io`` and ``plotter``.
 
-    The interfaced environment needs to implement ``_update_observations``, ``reset_observations``, and ``get_reward`` methods.
+    The interfaced environment needs to implement ``_update_states``, ``reset_states``, and ``get_reward`` methods.
     Additionally, the ``get_properties`` method should be overridden if ``n_properties`` is non-zero.
 
     Parameters
@@ -65,6 +65,7 @@ class BaseEnv(ABC):
         ========================    ================================================
         has_delay                   (*bool*) option to implement delay functions. Default is ``False``.
         observation_space_range     (*list*) range of the observations. Default is ``[-1e9, 1e9]``.
+        observation_stds            (*list* or ``None``) standard deviations of the observed states from the actual states.
         action_space_range          (*list*) range of the actions. The output is scaled by the corresponding action multiplier. Default is ``[-1.0, 1.0]``.
         action_space_type           (*str*) the type of action space. Options are ``'binary'`` and ``'box'``. Default is ``'box``.
         cache_all_data              (*bool*) option to cache all data to disk. Default is ``True``.
@@ -85,6 +86,7 @@ class BaseEnv(ABC):
     base_env_kwargs = dict(
         has_delay=False,
         observation_space_range=[-1e12, 1e12],
+        observation_stds=None,
         action_space_range=[-1.0, 1.0],
         action_space_type='box',
         cache_all_data=True,
@@ -127,6 +129,7 @@ class BaseEnv(ABC):
         assert n_properties >= 0, "parameter ``n_properties`` should be non-negative"
         assert action_interval > 0, "parameter ``action_interval`` should be a positive integer"
         assert len(data_idxs) > 0, "parameter ``data_idxs`` should be a list containing at least one element"
+        assert kwargs['observation_stds'] is None or type(kwargs['observation_stds']) is list, "parameter ``observation_stds`` should be a list"
         assert type(kwargs['cache_all_data']) is bool, "parameter ``cache_all_data`` should be a boolean"
         assert kwargs['plot_interval'] > 0, "parameter ``plot_interval`` should be a positive integer"
         assert len(kwargs['plot_idxs']) == len(kwargs['axes_args']), "number of indices for plot should match number of axes arguments"
@@ -155,7 +158,7 @@ class BaseEnv(ABC):
         ) * t_norm_mul
         self.t_ssz = self.t_norm_ssz * t_norm_mul
 
-        # observation and property attributes
+        # observation attributes
         self.n_observations = n_observations
         self.observation_space_range = kwargs['observation_space_range']
         self.observation_space = Box(
@@ -164,6 +167,14 @@ class BaseEnv(ABC):
             shape=(self.n_observations, ),
             dtype=self.numpy_real
         )
+        self.observation_stds = kwargs['observation_stds']
+        if self.observation_stds is not None:
+            self.observation_stds = self.backend.convert_to_typed(
+                tensor=self.observation_stds,
+                dtype='real'
+            )
+
+        # property attributes
         self.n_properties = n_properties
 
         # action attributes
@@ -231,25 +242,25 @@ class BaseEnv(ABC):
             )
 
     @abstractmethod
-    def _update_observations(self):
-        """Method to update the observations for each step.
+    def _update_states(self):
+        """Method to update the states for each step.
 
         Returns
         -------
-        Observations: Any
-            The updated observations ``Observations`` with shape either ``(action_interval + 1, n_observations)`` or ``(action_interval + 1, n_envs, n_observations).
+        States: Any
+            The updated states with shape either ``(action_interval + 1, n_observations)`` or ``(action_interval + 1, n_envs, n_observations).
         """
 
         raise NotImplementedError
 
     @abstractmethod
-    def reset_observations(self):
-        """Method to obtain the initial observations.
+    def reset_states(self):
+        """Method to obtain the initial states.
 
         Returns
         -------
-        Observations: Any
-            The initial observations ``observations_0`` with shape either ``(n_observations, )`` or ``(n_envs, n_observations)``, which are assigned to all elements of ``Observations`` with shape ``(action_interval + 1, n_observations, )`` or ``(action_interval + 1, n_envs, n_observations)``.
+        states_0: Any
+            The initial states with shape either ``(n_observations, )`` or ``(n_envs, n_observations)``, which are assigned to all elements of ``Observations`` with shape ``(action_interval + 1, n_observations, )`` or ``(action_interval + 1, n_envs, n_observations)``.
         """
 
         raise NotImplementedError
@@ -259,7 +270,7 @@ class BaseEnv(ABC):
 
         Returns
         -------
-        Observations: Any
+        Properties: Any
             The properties calculated from ``Observations`` with shape either ``(action_interval + 1, n_properties)`` or ``(action_interval + 1, n_envs, n_properties)``.
         """
 
@@ -271,14 +282,14 @@ class BaseEnv(ABC):
 
         Returns
         -------
-        Observations: Any
-            The reward calculated using the observations or the properties with shape either ``(action_interval + 1, )`` or ``(action_interval + 1, n_envs)``.
+        Reward: Any
+            The reward calculated using ``States``, ``Observations`` or ``Properties`` with shape either ``(action_interval + 1, )`` or ``(action_interval + 1, n_envs)``.
         """
 
         raise NotImplementedError
 
     def validate_environment(self,
-        shape_reset_observations:tuple,
+        shape_reset_states:tuple,
         shape_get_properties:tuple,
         shape_get_reward:tuple
     ):
@@ -286,8 +297,8 @@ class BaseEnv(ABC):
 
         Parameters
         ----------
-        shape_reset_observations: tuple
-            Shape of the array returned by ``reset_observations``.
+        shape_reset_states: tuple
+            Shape of the array returned by ``reset_states``.
         shape_get_properties: tuple
             Shape of the array returned by ``get_properties``.
         shape_get_reward: tuple
@@ -295,18 +306,27 @@ class BaseEnv(ABC):
         """
 
         try:
-            # validate initial observations
-            observations_0 = self.backend.convert_to_typed(
-                tensor=self.reset_observations()
+            # validate initial states
+            states_0 = self.backend.convert_to_typed(
+                tensor=self.reset_states()
             )
             assert self.backend.shape(
-                tensor=observations_0
-            ) == shape_reset_observations, "``reset_observations`` should return an array with shape ``{}``".format(shape_reset_observations)
-            # initialize observations for each time step
+                tensor=states_0
+            ) == shape_reset_states, "``reset_states`` should return an array with shape ``{}``".format(shape_reset_states)
+            # initialize states
+            self.States = self.backend.repeat(
+                tensor=self.backend.reshape(
+                    tensor=states_0,
+                    shape=(1, *shape_reset_states)
+                ),
+                repeats=self.action_interval + 1,
+                axis=0
+            )
+            # initialize observations
             self.Observations = self.backend.repeat(
                 tensor=self.backend.reshape(
-                    tensor=observations_0,
-                    shape=(1, *shape_reset_observations)
+                    tensor=states_0,
+                    shape=(1, *shape_reset_states)
                 ),
                 repeats=self.action_interval + 1,
                 axis=0
@@ -327,16 +347,16 @@ class BaseEnv(ABC):
                 tensor=self.Reward
             ) == shape_get_reward, "``get_reward`` should return an array with shape ``{}``".format(shape_get_reward)
         except AttributeError as error:
-            print(f"Missing required method or attribute: ({error}). Refer to **Notes** of :class:`quantrl.envs.base.BaseEnv` for the implementation format of the missing method or add the missing attribute to the ``reset_observations`` method.")
+            print(f"Missing required method or attribute: ({error}). Refer to **Notes** of :class:`quantrl.envs.base.BaseEnv` for the implementation format of the missing method or add the missing attribute to the ``reset_states`` method.")
             exit()
 
     def reset(self):
-        """Method to reset the time and obtain initial observations as a typed tensor.
+        """Method to reset the time and obtain initial states as a typed tensor.
 
         Returns
         -------
-        observations_0: Any
-            Inititial observations.
+        states_0: Any
+            Inititial states.
         """
 
         # reset time
@@ -344,10 +364,46 @@ class BaseEnv(ABC):
         self.t = self.numpy_real(0.0)
         self.action_idx = 0
 
-        # update observations
-        observations_0 = self.backend.convert_to_typed(
-            tensor=self.reset_observations()
+        # initialize states
+        states_0 = self.backend.convert_to_typed(
+            tensor=self.reset_states()
         )
+        _shape = self.backend.shape(
+            tensor=states_0
+        )
+        self.States = self.backend.repeat(
+            tensor=self.backend.reshape(
+                tensor=states_0,
+                shape=(1, *_shape)
+            ),
+            repeats=self.action_interval + 1,
+            axis=0
+        )
+        # initialize measurement noises
+        if self.observation_stds is not None:
+            self.Observation_noises = self.backend.normal(
+                generator=self.backend.generator(
+                    seed=None
+                ),
+                shape=(self.shape_T[0], *_shape),
+                mean=0.0,
+                std=1.0,
+                dtype='real'
+            ) * self.backend.repeat(
+                tensor=self.backend.reshape(
+                    tensor=self.observation_stds,
+                    shape=(1, *_shape)
+                ),
+                repeats=self.shape_T[0],
+                axis=0
+            )
+        else:
+            self.Observation_noises = self.backend.zeros(
+                shape=(self.shape_T[0], *_shape),
+                dtype='real'
+            )
+        # initialize observations
+        observations_0 = states_0 + self.Observation_noises[0]
         self.Observations = self.backend.repeat(
             tensor=self.backend.reshape(
                 tensor=observations_0,
@@ -377,9 +433,13 @@ class BaseEnv(ABC):
         # set evaluation times
         _dim_T = self.shape_T[0]
         self.T_step = self.T[self.t_idx:self.t_idx + self.action_interval + 1] if self.t_idx + self.action_interval < _dim_T else self.T[self.t_idx:]
+        _dim_T_step = self.backend.shape(
+            tensor=self.T_step
+        )[0]
 
-        # step and update observations
-        self.Observations = self._update_observations()
+        # update actual states and observed states
+        self.States = self._update_states()
+        self.Observations = self.States + self.Observation_noises[self.t_idx:self.t_idx + _dim_T_step]
 
         # update properties
         if self.n_properties > 0:
@@ -393,9 +453,6 @@ class BaseEnv(ABC):
         )
 
         # update time
-        _dim_T_step = self.backend.shape(
-            tensor=self.T_step
-        )[0]
         self.t_idx += _dim_T_step - 1
         self.t = self.T[self.t_idx]
         self.action_idx += 1
@@ -591,7 +648,7 @@ class BaseEnv(ABC):
             self.plotter.close()
 
         # clean
-        del self.T, self.T_norm, self.T_step, self.actions, self.Observations, self.Reward
+        del self.T, self.T_norm, self.T_step, self.actions, self.States, self.Observations, self.Reward
         if self.n_properties > 0:
             del self.Properties
         del self
@@ -638,7 +695,7 @@ class BaseGymEnv(BaseEnv, Env):
 
         # validate interfaced environment
         self.validate_environment(
-            shape_reset_observations=(self.n_observations, ),
+            shape_reset_states=(self.n_observations, ),
             shape_get_properties=(self.action_interval + 1, self.n_properties),
             shape_get_reward=(self.action_interval + 1, )
         )
@@ -857,7 +914,8 @@ class BaseGymEnv(BaseEnv, Env):
             )
 
     def close(self,
-        save=True
+        save=True,
+        axis_args=None
     ):
         """Method to close the environment.
         
@@ -865,6 +923,8 @@ class BaseGymEnv(BaseEnv, Env):
         ----------
         save: bool, default=True
             Option to save the learning curve and replay.
+        axis_args: list, default=None
+            Axis properties. The first element is the ``x_label``, the second is ``y_label``, the third is ``[y_limit_min, y_limit_max]`` and the fourth is ``y_scale``.
         """
 
         if save:
@@ -875,6 +935,7 @@ class BaseGymEnv(BaseEnv, Env):
             # save learning curve
             self.plot_learning_curve(
                 data_rewards=_data_rewards.reshape((len(_data_rewards), 1)),
+                axis_args=axis_args,
                 hold=False
             )
         del self.rewards, self.data_rewards, self.all_data, self.data
@@ -949,7 +1010,7 @@ class BaseSB3Env(BaseEnv, VecEnv):
 
         # validate interfaced environment
         self.validate_environment(
-            shape_reset_observations=(self.n_envs, self.n_observations),
+            shape_reset_states=(self.n_envs, self.n_observations),
             shape_get_properties=(self.action_interval + 1, self.n_envs, self.n_properties),
             shape_get_reward=(self.action_interval + 1, self.n_envs)
         )
@@ -1320,7 +1381,8 @@ class BaseSB3Env(BaseEnv, VecEnv):
             )
 
     def close(self,
-        save=True
+        save=True,
+        axis_args=None
     ):
         """Method to close the environment.
 
@@ -1328,6 +1390,8 @@ class BaseSB3Env(BaseEnv, VecEnv):
         ----------
         save: bool, default=True
             Option to save the learning curve and replay.
+        axis_args: list, default=None
+            Axis properties. The first element is the ``x_label``, the second is ``y_label``, the third is ``[y_limit_min, y_limit_max]`` and the fourth is ``y_scale``.
         """
 
         # save learning curve
@@ -1338,6 +1402,7 @@ class BaseSB3Env(BaseEnv, VecEnv):
             )
             self.plot_learning_curve(
                 data_rewards=_data_rewards.reshape((_data_rewards.shape[0] * self.n_envs, 1)),
+                axis_args=axis_args,
                 hold=False
             )
 

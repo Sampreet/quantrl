@@ -13,12 +13,13 @@
 
 ### What's New in v0.0.7
 
+* Added support for measurement noise in observations.
 * Updated stochastic environment for fast Wiener processes.
 * Asynchronous cache-dump to speed up environment evolution.
 
 ### What's New in v0.0.6
 
-* Initialize your environment with any of the different backends: NumPy, PyTorch and JAX.
+* Initialize environments with any of the three backends: NumPy, PyTorch and JAX.
 * Solve IVPs for the popular libraries `TorchDiffEq` and `Diffrax`.
 
 ## Installation
