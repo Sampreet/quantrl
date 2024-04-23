@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.stochastic'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-04-04"
+__updated__ = "2024-04-22"
 
 # dependencies
 import numpy as np
@@ -71,11 +71,6 @@ class LinearEnv(BaseGymEnv):
     default_params = dict()
     """dict: Default parameters of the environment."""
 
-    default_solver_params = dict(
-        seed=None
-    )
-    """dict: Default parameters of the solver."""
-
     backend_libraries = ['torch', 'jax', 'numpy']
     """list: Available backend libraries."""
 
@@ -102,7 +97,6 @@ class LinearEnv(BaseGymEnv):
 
         # validate arguments
         assert backend_library in self.backend_libraries, "parameter ``solver_type`` should be one of ``{}``".format(self.backend_libraries)
-        assert kwargs['seed'] is None or type(kwargs['seed']) is int, "parameter ``seed`` should be an integer"
 
         # select backend
         if 'torch' in backend_library:
@@ -130,9 +124,6 @@ class LinearEnv(BaseGymEnv):
         self.params = dict()
         for key in self.default_params:
             self.params[key] = params.get(key, self.default_params[key])
-        # update keyword arguments
-        for key in self.default_solver_params:
-            kwargs[key] = kwargs.get(key, self.default_solver_params[key])
         # set buffers
         self.I = backend.eye(
             rows=n_observations,
@@ -163,10 +154,12 @@ class LinearEnv(BaseGymEnv):
             file_prefix='lin_env',
             **kwargs
         )
-        # set noise parameters
-        self.seed = int(kwargs['seed'])
 
         # initialize buffers
+        self.add_0 = self.backend.empty(
+            shape=(self.n_observations, ),
+            dtype='real'
+        )
         self.matmul_0 = self.backend.empty(
             shape=(self.n_observations, ),
             dtype='real'
@@ -177,13 +170,13 @@ class LinearEnv(BaseGymEnv):
         options:dict=None
     ):
         # update Wiener noises
-        self.Ws = self.backend.normal(
+        self.Ws = np.sqrt(self.t_ssz) * self.backend.normal(
             generator=self.backend.generator(
                 seed=self.seed
             ),
             shape=(self.shape_T[0] - 1, self.n_observations),
             mean=0.0,
-            std=np.sqrt(self.t_ssz),
+            std=1.0,
             dtype='real'
         )
 
@@ -200,23 +193,20 @@ class LinearEnv(BaseGymEnv):
         )[0]
 
         # initialize states
-        _Y = self.backend.update(
-            tensor=self.backend.empty(
-                shape=(self.action_interval + 1, self.n_observations),
-                dtype='real'
-            ),
+        _States = self.backend.update(
+            tensor=self.States,
             indices=0,
             values=self.States[-1]
         )
-        
+
         # iterate and return
         return self.backend.iterate_i(
             func=self.func,
             iterations_i=_dim - 1,
-            Y=_Y,
+            Y=_States,
             args=(self.actions, None, None)
         )
-    
+
     def func(self,
         i,
         Y,
@@ -228,7 +218,7 @@ class LinearEnv(BaseGymEnv):
         ----------
         i: int
             Index of the iteration.
-        y: Any
+        Y: Any
             Real-valued variables.
         args: tuple
             Actions, control function and delay function.
@@ -249,15 +239,19 @@ class LinearEnv(BaseGymEnv):
             t_idx=self.t_idx + i,
             args=args
         )
-        # update states
+        # return updated states
         return self.backend.update(
             tensor=Y,
             indices=i + 1,
-            values=self.backend.matmul(
-                tensor_0=M_i,
-                tensor_1=Y[i],
-                out=None
-            ) + n_i * self.Ws[self.t_idx + i]
+            values=self.backend.add(
+                tensor_0=self.backend.matmul(
+                    tensor_0=M_i,
+                    tensor_1=Y[i],
+                    out=self.matmul_0
+                ),
+                tensor_1=n_i * self.Ws[self.t_idx + i],
+                out=self.add_0
+            )
         )
 
     def get_A(self,

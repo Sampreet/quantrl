@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.jax'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-03-23"
+__updated__ = "2024-04-22"
 
 # dependencies
 from inspect import getfullargspec
@@ -34,6 +34,9 @@ class JaxBackend(BaseBackend):
         # enable 64-bit mode
         if self.precision == 'double':
             jax.config.update('jax_enable_x64', True)
+
+        # set key
+        self.key = None
 
         def numpy_transpose(
             tensor,
@@ -112,14 +115,17 @@ class JaxBackend(BaseBackend):
             dtype=dtype,
             numpy=True
         ) if dtype is not None else None))
-    
+
     def generator(self,
         seed:int=None
     ):
-        if seed is None:
-            seed = np.random.randint(1000)
-        return jax.block_until_ready(jax.random.key(seed))
-    
+        if self.key is None:
+            if seed is not None:
+                seed = np.random.randint(1000)
+            self.key = jax.block_until_ready(jax.random.key(seed))
+        self.key, key = jax.random.split(self.key)
+        return key
+
     def integers(self,
         generator,
         shape:tuple,
@@ -130,7 +136,7 @@ class JaxBackend(BaseBackend):
         return jax.block_until_ready(jax.random.randint(generator, shape, low, high, dtype=self.dtype_from_str(
             dtype=dtype
         )))
-    
+
     def normal(self,
         generator,
         shape:tuple,

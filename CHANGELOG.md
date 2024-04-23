@@ -1,5 +1,13 @@
 # Changelog
 
+## 2024/04/23 - 00 - v0.0.7 - Hotfix for PRNGs
+* Updated ``generator`` methods in ``quantrl.backends`` package.
+* Updated `quantrl.envs.base` module:
+    * Added ``seed`` parameter to ``BaseEnv`` class.
+    * Initialized states, observations, properties and results, and made removed environment validation during initialization of ``BaseGymEnv`` and ``BaseSB3Env`` classes.
+    * Minor updates to cache and plot in ``step`` and ``evolve`` methods of ``BaseGymEnv`` class.
+* Minor fixes to `quantrl.envs.stochastic` module.
+
 ## 2024/04/04 - 00 - v0.0.7 - Added Observation Noise
 * Added option to add standard deviations of the observed states ``Observations`` from the actual states ``States`` through the ``observation_stds`` parameter in the ``reset`` and ``update`` methods.
 * Renamed ``reset_observations`` method to ``reset_states`` to reset the actual states ``States``.

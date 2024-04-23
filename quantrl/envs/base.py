@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-04-04"
+__updated__ = "2024-04-22"
 
 # dependencies
 from abc import ABC, abstractmethod
@@ -14,7 +14,7 @@ from gymnasium import Env
 from gymnasium.spaces import Box, MultiDiscrete
 from stable_baselines3.common import env_util
 from stable_baselines3.common.vec_env import VecEnv
-from tqdm import tqdm
+from tqdm.rich import tqdm
 import numpy as np
 
 # quantrl modules
@@ -23,6 +23,7 @@ from ..io import FileIO
 from ..plotters import TrajectoryPlotter
 
 # TODO: Interface ConsoleIO
+# TODO: Support for different number of states and observables
 
 class BaseEnv(ABC):
     r"""Base environment for reinforcement-learning.
@@ -68,6 +69,7 @@ class BaseEnv(ABC):
         observation_stds            (*list* or ``None``) standard deviations of the observed states from the actual states.
         action_space_range          (*list*) range of the actions. The output is scaled by the corresponding action multiplier. Default is ``[-1.0, 1.0]``.
         action_space_type           (*str*) the type of action space. Options are ``'binary'`` and ``'box'``. Default is ``'box``.
+        seed                        (*int*) seed to initialize random number generators. If ``None``, a random integer seed is generated. Default is ``None``.
         cache_all_data              (*bool*) option to cache all data to disk. Default is ``True``.
         cache_dump_interval         (*int*) number of environments to cache before dumping to disk. Default is ``100``.
         average_over                (*int*) number of episodes to run the running average over. This value should be less than or equal to the total number of episodes. Default is ``100``.
@@ -89,6 +91,7 @@ class BaseEnv(ABC):
         observation_stds=None,
         action_space_range=[-1.0, 1.0],
         action_space_type='box',
+        seed=None,
         cache_all_data=True,
         cache_dump_interval=100,
         average_over=100,
@@ -130,6 +133,7 @@ class BaseEnv(ABC):
         assert action_interval > 0, "parameter ``action_interval`` should be a positive integer"
         assert len(data_idxs) > 0, "parameter ``data_idxs`` should be a list containing at least one element"
         assert kwargs['observation_stds'] is None or type(kwargs['observation_stds']) is list, "parameter ``observation_stds`` should be a list"
+        assert kwargs['seed'] is None or type(kwargs['seed']) is int, "parameter ``seed`` should be an integer or ``None``"
         assert type(kwargs['cache_all_data']) is bool, "parameter ``cache_all_data`` should be a boolean"
         assert kwargs['plot_interval'] > 0, "parameter ``plot_interval`` should be a positive integer"
         assert len(kwargs['plot_idxs']) == len(kwargs['axes_args']), "number of indices for plot should match number of axes arguments"
@@ -206,6 +210,9 @@ class BaseEnv(ABC):
         # align delay with action interval
         self.has_delay = kwargs['has_delay']
         self.t_delay = self.T[self.action_interval] - self.T[0]
+
+        # initialize seed
+        self.seed = kwargs['seed']
 
         # data constants
         self.dir_path = dir_prefix + '/' + '_'.join([
@@ -323,13 +330,10 @@ class BaseEnv(ABC):
                 axis=0
             )
             # initialize observations
-            self.Observations = self.backend.repeat(
-                tensor=self.backend.reshape(
-                    tensor=states_0,
-                    shape=(1, *shape_reset_states)
-                ),
-                repeats=self.action_interval + 1,
-                axis=0
+            self.Observations = self.backend.update(
+                tensor=self.Observations,
+                indices=(slice(None), ),
+                values=self.States
             )
             # validate properties
             if self.n_properties > 0:
@@ -383,7 +387,7 @@ class BaseEnv(ABC):
         if self.observation_stds is not None:
             self.Observation_noises = self.backend.normal(
                 generator=self.backend.generator(
-                    seed=None
+                    seed=self.seed
                 ),
                 shape=(self.shape_T[0], *_shape),
                 mean=0.0,
@@ -464,7 +468,7 @@ class BaseEnv(ABC):
 
     def check_truncation(self):
         """Method to check if the current episode needs to be truncated.
-        
+
         Returns
         -------
         truncated: bool
@@ -693,19 +697,35 @@ class BaseGymEnv(BaseEnv, Env):
             **kwargs
         )
 
-        # validate interfaced environment
-        self.validate_environment(
-            shape_reset_states=(self.n_observations, ),
-            shape_get_properties=(self.action_interval + 1, self.n_properties),
-            shape_get_reward=(self.action_interval + 1, )
-        )
-
         # initialize Gymnasium environment
         Env.__init__(self)
 
         # initialize buffers
         self.traj_idx = -1
+        self.States = self.backend.empty(
+            shape=(self.action_interval + 1, self.n_observations),
+            dtype='real'
+        )
+        self.Observations = self.backend.empty(
+            shape=(self.action_interval + 1, self.n_observations),
+            dtype='real'
+        )
+        self.Properties = self.backend.empty(
+            shape=(self.action_interval + 1, self.n_properties),
+            dtype='real'
+        )
+        self.Reward = self.backend.empty(
+            shape=(self.action_interval + 1, ),
+            dtype='real'
+        )
         self.data_rewards = list()
+
+    def validate_environment(self):
+        return super().validate_environment(
+            shape_reset_states=(self.n_observations, ),
+            shape_get_properties=(self.action_interval + 1, self.n_properties),
+            shape_get_reward=(self.action_interval + 1, )
+        )
 
     def reset(self,
         seed:float=None,
@@ -786,9 +806,10 @@ class BaseGymEnv(BaseEnv, Env):
         # if trajectory ends
         if terminated or truncated:
             # update cache
-            self.io.update_cache(
-                data=self.all_data
-            )
+            if self.cache_all_data:
+                self.io.update_cache(
+                    data=self.all_data
+                )
             # update episode reward
             self.data_rewards.append(self.rewards)
             # update plotter
@@ -899,13 +920,20 @@ class BaseGymEnv(BaseEnv, Env):
                 print("Trajectory truncated")
                 break
 
-        # plot
-        if self.plot:
+        # udpate cache
+        if self.cache_all_data:
+            self.io.update_cache(
+                data=self.all_data
+            )
+
+        # update plot
+        if self.plot and self.traj_idx % self.plot_interval == 0:
             self.plotter.plot_lines(
                 xs=self.T_norm,
-                Y=self.all_data[:, self.plot_idxs]
+                Y=self.all_data[:, self.plot_idxs],
+                traj_idx=self.traj_idx,
+                update_buffer=True
             )
-            self.plotter.hold_plot()
 
         # close environment
         if close:
@@ -918,7 +946,7 @@ class BaseGymEnv(BaseEnv, Env):
         axis_args=None
     ):
         """Method to close the environment.
-        
+
         Parameters
         ----------
         save: bool, default=True
@@ -1008,13 +1036,6 @@ class BaseSB3Env(BaseEnv, VecEnv):
             axis=0
         )
 
-        # validate interfaced environment
-        self.validate_environment(
-            shape_reset_states=(self.n_envs, self.n_observations),
-            shape_get_properties=(self.action_interval + 1, self.n_envs, self.n_properties),
-            shape_get_reward=(self.action_interval + 1, self.n_envs)
-        )
-
         # initialize SB3 environment
         VecEnv.__init__(self,
             num_envs=self.n_envs,
@@ -1024,18 +1045,41 @@ class BaseSB3Env(BaseEnv, VecEnv):
 
         # initialize buffers
         self.batch_idx = -1
+        self.States = self.backend.empty(
+            shape=(self.action_interval + 1, self.n_envs, self.n_observations),
+            dtype='real'
+        )
+        self.Observations = self.backend.empty(
+            shape=(self.action_interval + 1, self.n_envs, self.n_observations),
+            dtype='real'
+        )
+        self.Properties = self.backend.empty(
+            shape=(self.action_interval + 1, self.n_envs, self.n_properties),
+            dtype='real'
+        )
+        self.Reward = self.backend.empty(
+            shape=(self.action_interval + 1, self.n_envs),
+            dtype='real'
+        )
         self.rewards = None
         self.data_rewards = list()
         self.data = None
         if self.plot:
             self.env_idx_arr = np.arange(self.n_envs, dtype=self.numpy_int)
 
+    def validate_environment(self):
+        return super().validate_environment(
+            shape_reset_states=(self.n_envs, self.n_observations),
+            shape_get_properties=(self.action_interval + 1, self.n_envs, self.n_properties),
+            shape_get_reward=(self.action_interval + 1, self.n_envs)
+        )
+
     def env_is_wrapped(self,
         wrapper_class,
         indices=None
     ):
         """Method to check if a batch of sub-environments are wrapped with the given wrapper.
-        
+
         Parameters
         ----------
         wrapper_class: :class:`gymnasium.Wrapper`
@@ -1354,7 +1398,7 @@ class BaseSB3Env(BaseEnv, VecEnv):
                 print("Batch truncated")
                 break
 
-        # plot
+        # update plot
         if self.plot:
             for _i in tqdm(
                 range(len(self.plotter_env_idxs)),
