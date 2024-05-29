@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-04-22"
+__updated__ = "2024-05-29"
 
 # dependencies
 from abc import ABC, abstractmethod
@@ -61,24 +61,26 @@ class BaseEnv(ABC):
         Prefix of the files where the data will be stored.
     kwargs: dict
         Keyword arguments. Available options are:
+        
         ========================    ================================================
         key                         value
         ========================    ================================================
         has_delay                   (*bool*) option to implement delay functions. Default is ``False``.
-        observation_space_range     (*list*) range of the observations. Default is ``[-1e9, 1e9]``.
-        observation_stds            (*list* or ``None``) standard deviations of the observed states from the actual states.
+        observation_space_range     (*list*) range of the observations. Default is ``[-1e12, 1e12]``.
+        observation_stds            (*list* or ``None``) standard deviations of the observed states from the actual states. Default is ``None``.
         action_space_range          (*list*) range of the actions. The output is scaled by the corresponding action multiplier. Default is ``[-1.0, 1.0]``.
         action_space_type           (*str*) the type of action space. Options are ``'binary'`` and ``'box'``. Default is ``'box``.
         seed                        (*int*) seed to initialize random number generators. If ``None``, a random integer seed is generated. Default is ``None``.
-        cache_all_data              (*bool*) option to cache all data to disk. Default is ``True``.
+        cache_all_data              (*bool*) option to cache all data to disk. If ``False``, only the indices of ``data_idxs`` are stored. Default is ``True``.
         cache_dump_interval         (*int*) number of environments to cache before dumping to disk. Default is ``100``.
         average_over                (*int*) number of episodes to run the running average over. This value should be less than or equal to the total number of episodes. Default is ``100``.
         plot                        (*bool*) option to plot the trajectories using ``:class:BaseTrajectoryPlotter``. Default is ``True``.
-        plot_interval               (*int*) number of trajectories after which the plots are updated. Must be a positive integer.
+        plot_interval               (*int*) number of trajectories after which the plots are updated. Must be a positive integer. Default is ``10``.
         plot_idxs                   (*list*) indices of the data values required to plot at each time step. Default is ``[-1]`` for the cummulative reward.
         axes_args                   (*list*) lists of axis properties. The first element of each is the ``x_label``, the second is ``y_label``, the third is ``[y_limit_min, y_limit_max]`` and the fourth is ``y_scale``. Default is ``[['$t / t_{0}$', '$\\tilde{R}$', [np.sqrt(10) * 1e-1, np.sqrt(10) * 1e6], 'log']]``.
-        axes_lines_max              (*int*) maximum number of lines to display in each plot. Higher numbers slow down the run. Default is ``100``.
+        axes_lines_max              (*int*) maximum number of lines to display in each plot. Higher numbers slow down the run. Default is ``10``.
         axes_cols                   (*int*) number of columns in the figure. Default is ``2``.
+        plot_buffer                 (*bool*) option to store a buffer of plots for to make a gif file. Default is ``False``.
         ========================    ================================================
     """
 
@@ -102,7 +104,8 @@ class BaseEnv(ABC):
             ['$t / \\tau$', '$\\tilde{R}$', [np.sqrt(10) * 1e-5, np.sqrt(10) * 1e4], 'log']
         ],
         axes_lines_max=10,
-        axes_cols=2
+        axes_cols=2,
+        plot_buffer=False
     )
     """dict: Default values of all keyword arguments."""
 
@@ -229,15 +232,17 @@ class BaseEnv(ABC):
         # initialize IO
         self.data_idxs = data_idxs
         self.cache_all_data = kwargs['cache_all_data']
+        self.cache_dump_interval = kwargs['cache_dump_interval']
         self.io = FileIO(
             disk_cache_dir=self.file_path_prefix + '_cache',
-            cache_dump_interval=kwargs['cache_dump_interval']
+            cache_dump_interval=self.cache_dump_interval
         )
 
         # plot constants
         self.plot = kwargs['plot']
         self.plot_interval = kwargs['plot_interval']
         self.plot_idxs = kwargs['plot_idxs']
+        self.plot_buffer = kwargs['plot_buffer']
         # initialize plotter
         if self.plot:
             self.plotter = TrajectoryPlotter(
@@ -606,7 +611,7 @@ class BaseEnv(ABC):
                 xs=self.T_norm,
                 Y=replay_data[i],
                 traj_idx=idx_start + i,
-                update_buffer=True
+                update_buffer=self.plot_buffer
             )
         # make gif
         if make_gif:
@@ -806,10 +811,9 @@ class BaseGymEnv(BaseEnv, Env):
         # if trajectory ends
         if terminated or truncated:
             # update cache
-            if self.cache_all_data:
-                self.io.update_cache(
-                    data=self.all_data
-                )
+            self.io.update_cache(
+                data=self.all_data if self.cache_all_data else self.data
+            )
             # update episode reward
             self.data_rewards.append(self.rewards)
             # update plotter
@@ -818,7 +822,7 @@ class BaseGymEnv(BaseEnv, Env):
                     xs=self.T_norm,
                     Y=self.all_data[:, self.plot_idxs],
                     traj_idx=self.traj_idx,
-                    update_buffer=True
+                    update_buffer=self.plot_buffer
                 )
 
         return observations, reward, terminated, truncated, {}
@@ -921,10 +925,9 @@ class BaseGymEnv(BaseEnv, Env):
                 break
 
         # udpate cache
-        if self.cache_all_data:
-            self.io.update_cache(
-                data=self.all_data
-            )
+        self.io.update_cache(
+            data=self.all_data if self.cache_all_data else self.data
+        )
 
         # update plot
         if self.plot and self.traj_idx % self.plot_interval == 0:
@@ -932,7 +935,7 @@ class BaseGymEnv(BaseEnv, Env):
                 xs=self.T_norm,
                 Y=self.all_data[:, self.plot_idxs],
                 traj_idx=self.traj_idx,
-                update_buffer=True
+                update_buffer=self.plot_buffer
             )
 
         # close environment
@@ -950,9 +953,9 @@ class BaseGymEnv(BaseEnv, Env):
         Parameters
         ----------
         save: bool, default=True
-            Option to save the learning curve and replay.
+            Option to save the learning curve and make a gif file from the plot buffer.
         axis_args: list, default=None
-            Axis properties. The first element is the ``x_label``, the second is ``y_label``, the third is ``[y_limit_min, y_limit_max]`` and the fourth is ``y_scale``.
+            Axis properties for the learning curve. The first element is the ``x_label``, the second is ``y_label``, the third is ``[y_limit_min, y_limit_max]`` and the fourth is ``y_scale``.
         """
 
         if save:
@@ -970,7 +973,7 @@ class BaseGymEnv(BaseEnv, Env):
 
         # close io
         self.io.close(
-            dump_cache=save
+            dump_cache=True
         )
 
         # clean
@@ -1261,7 +1264,7 @@ class BaseSB3Env(BaseEnv, VecEnv):
                         xs=self.T_norm,
                         Y=self.plotter_env_data[_i, :, :],
                         traj_idx=self.batch_idx * self.n_envs + self.plotter_env_idxs[_i],
-                        update_buffer=True
+                        update_buffer=self.plot_buffer
                     )
             # update episode reward
             self.data_rewards.append(self.rewards)
@@ -1411,7 +1414,7 @@ class BaseSB3Env(BaseEnv, VecEnv):
                     xs=self.T_norm,
                     Y=self.plotter_env_data[_i, :, :],
                     traj_idx=self.batch_idx * self.n_envs + self.plotter_env_idxs[_i],
-                    update_buffer=True
+                    update_buffer=self.plot_buffer
                 )
             self.plotter.hold_plot()
 
@@ -1433,9 +1436,9 @@ class BaseSB3Env(BaseEnv, VecEnv):
         Parameters
         ----------
         save: bool, default=True
-            Option to save the learning curve and replay.
+            Option to save the learning curve and make a gif file from the plot buffer.
         axis_args: list, default=None
-            Axis properties. The first element is the ``x_label``, the second is ``y_label``, the third is ``[y_limit_min, y_limit_max]`` and the fourth is ``y_scale``.
+            Axis properties for the learning curve. The first element is the ``x_label``, the second is ``y_label``, the third is ``[y_limit_min, y_limit_max]`` and the fourth is ``y_scale``.
         """
 
         # save learning curve
@@ -1457,7 +1460,7 @@ class BaseSB3Env(BaseEnv, VecEnv):
 
         # close io
         self.io.close(
-            dump_cache=save
+            dump_cache=True
         )
 
         # clean

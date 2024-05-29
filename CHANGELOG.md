@@ -1,5 +1,15 @@
 # Changelog
 
+## 2024/05/29 - 00 - v0.0.7 - Added Documentation
+* Added documentation for all modules.
+* Added ``uniform``, ``norm``, ``if_else`` and ``argmax`` methods in ``quantrl.backends`` package.
+* Updated `quantrl.envs` package:
+    * Update default parameters and added option to buffer plots in ``base.BaseEnv`` class.
+    * Added option to cache only the properties in ``base.BaseEnv`` class.
+    * Minor fixes to ``stochastic.LinearEnv`` class.
+* Added complex datatype option to `quantrl.solvers` package.
+* Added `CODE_OF_CONDUCT`, `CONTRIBUTING` and `LICENSE`.
+
 ## 2024/04/23 - 00 - v0.0.7 - Hotfix for PRNGs
 * Updated ``generator`` methods in ``quantrl.backends`` package.
 * Updated `quantrl.envs.base` module:

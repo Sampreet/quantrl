@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.jax'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-04-22"
+__updated__ = "2024-04-25"
 
 # dependencies
 from inspect import getfullargspec
@@ -120,7 +120,7 @@ class JaxBackend(BaseBackend):
         seed:int=None
     ):
         if self.key is None:
-            if seed is not None:
+            if seed is None:
                 seed = np.random.randint(1000)
             self.key = jax.block_until_ready(jax.random.key(seed))
         self.key, key = jax.random.split(self.key)
@@ -145,6 +145,17 @@ class JaxBackend(BaseBackend):
         dtype:str=None
     ) -> jxe.ArrayImpl:
         return mean + std * jax.block_until_ready(jax.random.normal(generator, shape, dtype=self.dtype_from_str(
+            dtype=dtype
+        )))
+
+    def uniform(self,
+        generator,
+        shape:tuple,
+        low:float=0.0,
+        high:float=1.0,
+        dtype:str=None
+    ) -> jxe.ArrayImpl:
+        return jax.block_until_ready(jax.random.uniform(generator, shape, minval=low, maxval=high, dtype=self.dtype_from_str(
             dtype=dtype
         )))
 
@@ -203,6 +214,12 @@ class JaxBackend(BaseBackend):
             out=out
         ))
 
+    def norm(self,
+        tensor,
+        axis
+    ) -> jxe.ArrayImpl:
+        return jax.block_until_ready(jnp.linalg.norm(tensor, axis=axis))
+
     def concatenate(self,
         tensors:tuple,
         axis,
@@ -231,6 +248,14 @@ class JaxBackend(BaseBackend):
         values
     ) -> jxe.ArrayImpl:
         return jax.block_until_ready(tensor.at[indices].set(values))
+    
+    def if_else(self,
+        condition,
+        func_true,
+        func_false,
+        args
+    ):
+        return jax.block_until_ready(jax.lax.cond(condition, func_true, func_false, (args, )))
 
     def iterate_i(self,
         func,

@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-03-23"
+__updated__ = "2024-05-29"
 
 # dependencies
 from abc import ABC, abstractmethod
@@ -14,7 +14,7 @@ import numpy as np
 
 class BaseBackend(ABC):
     """Backend to interface different NumPy-like libraries.
-    
+
     Parameters
     ----------
     library: Any
@@ -69,7 +69,7 @@ class BaseBackend(ABC):
         dtype:str=None
     ) -> bool:
         """Method to check if a tensor is a typed tensor of given dtype.
-        
+
         Parameters
         ----------
         tensor: Any
@@ -97,7 +97,7 @@ class BaseBackend(ABC):
         dtype:str=None
     ):
         """Method to obtain a typed tensor with given data-type from a numpy array or another typed tensor.
-        
+
         Parameters
         ----------
         tensor: Any
@@ -119,7 +119,7 @@ class BaseBackend(ABC):
         dtype:str=None
     ) -> np.ndarray:
         """Method to obtain a NumPy array from a typed tensor.
-        
+
         Parameters
         ----------
         tensor: Any
@@ -134,7 +134,7 @@ class BaseBackend(ABC):
         """
 
         raise NotImplementedError
-    
+
     @abstractmethod
     def generator(self,
         seed:int=None
@@ -153,7 +153,7 @@ class BaseBackend(ABC):
         """
 
         raise NotImplementedError
-    
+
     @abstractmethod
     def integers(self,
         generator,
@@ -184,7 +184,7 @@ class BaseBackend(ABC):
         """
 
         raise NotImplementedError
-    
+
     @abstractmethod
     def normal(self,
         generator,
@@ -217,13 +217,44 @@ class BaseBackend(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def uniform(self,
+        generator,
+        shape:tuple,
+        low:float=0.0,
+        high:float=1.0,
+        dtype:str=None
+    ):
+        """Method to obtain a typed tensor containing samples from a uniform distribution in the half-open interval ``[0, 1)``.
+
+        Parameters
+        ----------
+        generator: Any
+            Pseudo random number generator.
+        shape: tuple
+            Shape of the typed tensor.
+        low: float, default=0.0
+            Lowest value (inclusive).
+        high: float, default=1.0
+            Highest value (exclusive).
+        dtype: str, default=None
+            Broad data-type. Options are ``'integer'``, ``'real'`` and ``'complex'``. the data-type is casted to real.
+
+        Returns
+        -------
+        tensor: Any
+            Typed tensor containing the samples.
+        """
+
+        raise NotImplementedError
+
+    @abstractmethod
     def transpose(self,
         tensor,
         axis_0:int=None,
         axis_1:int=None
     ):
         """Method to transpose a typed tensor about two axes.
-        
+
         Parameters
         ----------
         tensor: Any
@@ -248,7 +279,7 @@ class BaseBackend(ABC):
         axis:int
     ):
         """Method to repeat a typed tensor about a given axis.
-        
+
         Parameters
         ----------
         tensor: Any
@@ -273,7 +304,7 @@ class BaseBackend(ABC):
         out
     ):
         """Method to add two typed tensors.
-        
+
         Parameters
         ----------
         tensor_0: Any
@@ -298,7 +329,7 @@ class BaseBackend(ABC):
         out
     ):
         """Method to obtain the matrix multiplication two typed tensors along the last two axes.
-        
+
         Parameters
         ----------
         tensor_0: Any
@@ -323,7 +354,7 @@ class BaseBackend(ABC):
         out
     ):
         """Method to obtain the dot product of two typed tensors.
-        
+
         Parameters
         ----------
         tensor_0: Any
@@ -342,13 +373,35 @@ class BaseBackend(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def norm(self,
+        tensor,
+        axis
+    ):
+        """Method to obtain the norm of a typed tensor along a given axis.
+
+        Parameters
+        ----------
+        tensor: Any
+            Typed tensor.
+        axis: int
+            Axis for the norm.
+
+        Returns
+        -------
+        tensor: Any
+            Norm of the typed tensor.
+        """
+
+        raise NotImplementedError
+
+    @abstractmethod
     def concatenate(self,
         tensors:tuple,
         axis,
         out
     ):
         """Method to concatenate multiple typed tensors along a given axis.
-        
+
         Parameters
         ----------
         tensors: tuple
@@ -365,7 +418,7 @@ class BaseBackend(ABC):
         """
 
         raise NotImplementedError
-    
+
     @abstractmethod
     def stack(self,
         tensors:tuple,
@@ -373,7 +426,7 @@ class BaseBackend(ABC):
         out
     ):
         """Method to stack multiple typed tensors along a given axis.
-        
+
         Parameters
         ----------
         tensors: tuple
@@ -386,9 +439,9 @@ class BaseBackend(ABC):
         tensor: Any
             Stacked tensor.
         """
-        
+
         return NotImplementedError
-    
+
     @abstractmethod
     def update(self,
         tensor,
@@ -396,10 +449,10 @@ class BaseBackend(ABC):
         values
     ):
         """Method to update selected indices of a typed tensor with given values.
-        
+
         Parameters
         ----------
-        tensors: Any
+        tensor: Any
             Typed tensor.
         indices: Any
             Indices to update.
@@ -415,6 +468,34 @@ class BaseBackend(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def if_else(self,
+        condition,
+        func_true,
+        func_false,
+        args
+    ):
+        """Method to execute conditional statements.
+
+        Parameters
+        ----------
+        condition: bool
+            Condition to check.
+        func_true: callable
+            Function to call when the condition is true.
+        func_false: callable
+            Function to call when the condition is False.
+        args: tuple
+            Arguments for the functions.
+
+        Returns
+        -------
+        tensor: Any
+            Output of the condition.
+        """
+
+        raise NotImplementedError
+
+    @abstractmethod
     def iterate_i(self,
         func,
         iterations_i:int,
@@ -422,7 +503,7 @@ class BaseBackend(ABC):
         args:tuple=None
     ):
         """Method to iterate over a single variable.
-        
+
         Parameters
         ----------
         func: callable
@@ -447,7 +528,7 @@ class BaseBackend(ABC):
         numpy:bool=False
     ):
         """Method to obtain the data-type from a string.
-        
+
         Parameters
         ----------
         dtype: str, default=None
@@ -463,7 +544,7 @@ class BaseBackend(ABC):
 
         # validate params
         assert dtype is None or dtype in ['integer', 'real', 'complex'], "parameter ``dtype`` can be either ``'integer'``, ``'real'`` or ``'complex'``."
-        
+
         # default dtype is the real data-type
         if dtype is None:
             dtype = 'real'
@@ -474,7 +555,7 @@ class BaseBackend(ABC):
         dtype:str=None
     ):
         """Method to create an empty typed tensor.
-        
+
         Parameters
         ----------
         shape: tuple
@@ -497,7 +578,7 @@ class BaseBackend(ABC):
         dtype:str=None
     ):
         """Method to create a typed tensor of zeros.
-        
+
         Parameters
         ----------
         shape: tuple
@@ -520,7 +601,7 @@ class BaseBackend(ABC):
         dtype:str=None
     ):
         """Method to create a typed tensor of ones.
-        
+
         Parameters
         ----------
         shape: tuple
@@ -539,17 +620,17 @@ class BaseBackend(ABC):
         ))
 
     def eye(self,
-        rows:int,
-        cols:int=None,
+        N:int,
+        M:int=None,
         dtype:str=None
     ):
         """Method to create an typed identity matrix.
-        
+
         Parameters
         ----------
-        rows: tuple
+        N: tuple
             Number of rows.
-        cols: int, defualt=None
+        M: int, defualt=None
             Number of columns. if ``None``, this value is set equal to the number of rows.
         dtype: str, default=None
             Broad data-type. Options are ``'integer'``, ``'real'`` and ``'complex'``. If ``None``, the data-type is casted to real.
@@ -560,7 +641,7 @@ class BaseBackend(ABC):
             Typed identity matrix.
         """
 
-        return self.library.eye(rows, (cols if cols is not None else rows), dtype=self.dtype_from_str(
+        return self.library.eye(N, (M if M is not None else N), dtype=self.dtype_from_str(
             dtype=dtype
         ))
 
@@ -569,7 +650,7 @@ class BaseBackend(ABC):
         dtype:str=None
     ):
         """Method to create an typed diagonal matrix.
-        
+
         Parameters
         ----------
         tensor: tuple
@@ -595,7 +676,7 @@ class BaseBackend(ABC):
         dtype:str=None
     ):
         """Method to create a typed tensor of evenly-stepped values from ``start`` (included) to ``stop`` (excluded).
-        
+
         Parameters
         ----------
         start: float
@@ -624,7 +705,7 @@ class BaseBackend(ABC):
         dtype:str=None
     ):
         """Method to create a typed tensor of linearly-spaced values from ``start`` to ``stop``, both inclusive.
-        
+
         Parameters
         ----------
         start: float
@@ -650,7 +731,7 @@ class BaseBackend(ABC):
         tensor
     ) -> tuple:
         """Method to obtain the shape of a tensor.
-        
+
         Parameters
         ----------
         tensor: Any
@@ -671,7 +752,7 @@ class BaseBackend(ABC):
         shape:tuple
     ):
         """Method to reshape a typed tensor.
-        
+
         Parameters
         ----------
         tensor: Any
@@ -693,7 +774,7 @@ class BaseBackend(ABC):
         tensor
     ):
         """Method to flatten typed tensor.
-        
+
         Parameters
         ----------
         tensor: Any
@@ -713,7 +794,7 @@ class BaseBackend(ABC):
         tensor
     ):
         """Method to obtain the real components of a complex typed tensor.
-        
+
         Parameters
         ----------
         tensor: Any
@@ -733,7 +814,7 @@ class BaseBackend(ABC):
         tensor
     ):
         """Method to obtain the imaginary components of a complex typed tensor.
-        
+
         Parameters
         ----------
         tensor: Any
@@ -749,11 +830,77 @@ class BaseBackend(ABC):
             tensor=tensor
         ))
 
+    def sqrt(self,
+        tensor
+    ):
+        """Method to obtain the square root of a typed tensor.
+
+        Parameters
+        ----------
+        tensor: Any
+            Given typed tensor.
+
+        Returns
+        -------
+        tensor: Any
+            Square root of the typed tensor.
+        """
+
+        return self.library.sqrt(self.convert_to_typed(
+            tensor=tensor
+        ))
+
+    def sum(self,
+        tensor,
+        axis
+    ):
+        """Method to obtain the sum of a typed tensor along a given axis.
+
+        Parameters
+        ----------
+        tensor: Any
+            Given typed tensor.
+        axis: Any
+            Axis along which the sum is to be calculated.
+
+        Returns
+        -------
+        tensor: Any
+            Sum of the typed tensor along the axis.
+        """
+
+        return self.library.sum(self.convert_to_typed(
+            tensor=tensor
+        ), axis)
+
+    def cumsum(self,
+        tensor,
+        axis
+    ):
+        """Method to obtain the cumulative sum of a typed tensor along a given axis.
+
+        Parameters
+        ----------
+        tensors: Any
+            Given typed tensor.
+        axis: Any
+            Axis along which the sum is to be calculated.
+
+        Returns
+        -------
+        tensor: Any
+            Cumulative um of the typed tensor along the axis.
+        """
+
+        return self.library.cumsum(self.convert_to_typed(
+            tensor=tensor
+        ), axis)
+
     def conj(self,
         tensor
     ):
         """Method to obtain the complex conjugate of a typed tensor.
-        
+
         Parameters
         ----------
         tensor: Any
@@ -773,7 +920,7 @@ class BaseBackend(ABC):
         tensor
     ):
         """Method to obtain the minimum value(s) of a typed tensor along an axis.
-        
+
         Parameters
         ----------
         tensor: Any
@@ -792,8 +939,8 @@ class BaseBackend(ABC):
     def max(self,
         tensor
     ):
-        """Method to obtain the maximum value(s) of a typed tensor along an axis.
-        
+        """Method to obtain the maximum value(s) of a typed tensor.
+
         Parameters
         ----------
         tensor: Any
@@ -802,9 +949,29 @@ class BaseBackend(ABC):
         Returns
         -------
         max: Any
-            Maximum value(s) of the typed tensor along the given axis.
+            Maximum value(s) of the typed tensor.
         """
 
         return self.library.max(self.convert_to_typed(
+            tensor=tensor
+        ))
+
+    def argmax(self,
+        tensor
+    ):
+        """Method to obtain the argument of the maximum value(s) of a typed tensor.
+
+        Parameters
+        ----------
+        tensor: Any
+            Given typed tensor.
+
+        Returns
+        -------
+        argmax: Any
+            Argument of the maximum value(s) of the typed tensor.
+        """
+
+        return self.library.argmax(self.convert_to_typed(
             tensor=tensor
         ))

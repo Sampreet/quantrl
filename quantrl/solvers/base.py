@@ -6,7 +6,7 @@
 __name__    = 'quantrl.solvers.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-03-23"
+__updated__ = "2024-05-29"
 
 # dependencies
 from abc import ABC, abstractmethod
@@ -32,6 +32,7 @@ class BaseIVPSolver(ABC):
     solver_params: dict
         Parameters of the solver.
         Currently supported options are:
+
             ================    ====================================================
             key                 value
             ================    ====================================================
@@ -59,7 +60,8 @@ class BaseIVPSolver(ABC):
         'atol': 1e-12,
         'rtol': 1e-9,
         'is_stiff': False,
-        'step_interval': 10
+        'step_interval': 10,
+        'complex': False
     }
     """dict: Default parameters of the solver."""
 

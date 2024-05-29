@@ -135,6 +135,10 @@ class SciPyIVPSolver(BaseIVPSolver):
         Y: Any
             Values of the variables at the given points of time.
         """
+        # convert to tensor
+        y_0_flat = self.backend.convert_to_typed(
+            tensor=y_0_flat
+        )
 
         # integrate using FORTRAN-based solvers
         if self.solver_params['method'] in self.scipy_old_methods:
@@ -143,11 +147,9 @@ class SciPyIVPSolver(BaseIVPSolver):
                     *self.backend.shape(
                         tensor=T_step
                     ),
-                    *self.backend.shape(
-                        tensor=y_0_flat
-                    )
+                    *y_0_flat.shape
                 ),
-                dtype='real'
+                dtype='complex' if self.solver_params['complex'] else 'real'
             )
             _Y_flat[0] = y_0_flat
             self.integrator.set_initial_value(

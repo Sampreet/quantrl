@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.numpy'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-04-22"
+__updated__ = "2024-04-25"
 
 # dependencies
 import numpy as np
@@ -82,6 +82,17 @@ class NumPyBackend(BaseBackend):
             dtype=dtype
         ))
 
+    def uniform(self,
+        generator:np.random.Generator,
+        shape:tuple,
+        low:float=0.0,
+        high:float=1.0,
+        dtype:str=None
+    ) -> np.ndarray:
+        return np.asarray(generator.uniform(low, high, shape), dtype=self.dtype_from_str(
+            dtype=dtype
+        ))
+
     def transpose(self,
         tensor,
         axis_0:int=None,
@@ -128,6 +139,12 @@ class NumPyBackend(BaseBackend):
     ) -> np.ndarray:
         return np.dot(tensor_0, tensor_1, out=out)
 
+    def norm(self,
+        tensor,
+        axis
+    ) -> np.ndarray:
+        return np.linalg.norm(tensor, axis=axis)
+
     def concatenate(self,
         tensors:tuple,
         axis,
@@ -149,6 +166,16 @@ class NumPyBackend(BaseBackend):
     ) -> np.ndarray:
         tensor[indices] = values
         return tensor
+    
+    def if_else(self,
+        condition,
+        func_true,
+        func_false,
+        args
+    ):
+        if condition:
+            return func_true(args)
+        return func_false(args)
 
     def iterate_i(self,
         func,

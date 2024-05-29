@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.torch'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-04-22"
+__updated__ = "2024-04-25"
 
 # dependencies
 import numpy as np
@@ -96,6 +96,17 @@ class TorchBackend(BaseBackend):
             dtype=dtype
         ).normal_(mean, std, generator=generator)
 
+    def uniform(self,
+        generator:torch.Generator,
+        shape:tuple,
+        low:float=0.0,
+        high:float=1.0,
+        dtype:str=None
+    ) -> torch.Tensor:
+        return low + (high - low) * torch.rand(shape, generator=generator, dtype=self.dtype_from_str(
+            dtype=dtype
+        ))
+
     def transpose(self,
         tensor,
         axis_0:int=None,
@@ -135,6 +146,12 @@ class TorchBackend(BaseBackend):
     ) -> torch.Tensor:
         return torch.dot(tensor_0, tensor_1, out=out)
 
+    def norm(self,
+        tensor,
+        axis
+    ) -> torch.Tensor:
+        return torch.norm(tensor, dim=axis)
+
     def concatenate(self,
         tensors:tuple,
         axis,
@@ -156,6 +173,16 @@ class TorchBackend(BaseBackend):
     ) -> torch.Tensor:
         tensor[indices] = values
         return tensor
+    
+    def if_else(self,
+        condition,
+        func_true,
+        func_false,
+        args
+    ):
+        if condition:
+            return func_true(args)
+        return func_false(args)
 
     def iterate_i(self,
         func,

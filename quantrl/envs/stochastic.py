@@ -6,9 +6,10 @@
 __name__    = 'quantrl.envs.stochastic'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-04-22"
+__updated__ = "2024-05-29"
 
 # dependencies
+from time import time
 import numpy as np
 
 # quantrl modules
@@ -126,8 +127,7 @@ class LinearEnv(BaseGymEnv):
             self.params[key] = params.get(key, self.default_params[key])
         # set buffers
         self.I = backend.eye(
-            rows=n_observations,
-            cols=None,
+            N=n_observations,
             dtype='real'
         )
         self.A = backend.zeros(
@@ -187,11 +187,6 @@ class LinearEnv(BaseGymEnv):
         )
 
     def _update_states(self):
-        # extract frequently used variables
-        _dim = self.backend.shape(
-            tensor=self.T_step
-        )[0]
-
         # initialize states
         _States = self.backend.update(
             tensor=self.States,
@@ -202,7 +197,9 @@ class LinearEnv(BaseGymEnv):
         # iterate and return
         return self.backend.iterate_i(
             func=self.func,
-            iterations_i=_dim - 1,
+            iterations_i=self.backend.shape(
+                tensor=self.T_step
+            )[0] - 1,
             Y=_States,
             args=(self.actions, None, None)
         )

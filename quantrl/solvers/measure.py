@@ -19,14 +19,12 @@ References
 .. [6] F. Galve, G. L. Giorgi and R. Zambrini, *Quantum Correlations and Synchronization Measures*, Lectures on General Quantum Correlations and their Applications, Quantum Science and Technology, Springer (2017).
 
 .. [7] N. Yang, A. Miranowicz, Y.-C. Liu, K. Xia and F. Nori, *Chaotic Synchronization of Two Optical Cavity Modes in Optomechanical Systems*, Sci. Rep. ***9***, 15874 (2019).
-
-.. [8] T. F. Roque, F. Marquardt and O. M. Yevtushenko, *Nonlinear Dynamics of Weakly Dissipative Optomechanical Systems*, New J. Phys. **22**, 013049 (2020).
 """
 
 __name__ = 'qom.solvers.measure'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2021-01-04"
-__updated__ = "2023-08-13"
+__updated__ = "2023-05-29"
 
 # dependencies
 from typing import Union
@@ -45,11 +43,12 @@ class QCMSolver():
         Quadrature quadrature correlations with shape ``(dim, 2 * num_modes, 2 * num_modes)``.
     params : dict
         Parameters for the solver. Available options are:
+
             ================    ====================================================
             key                 value
             ================    ====================================================
             'show_progress'     (*bool*) option to display the progress of the solver. Default is ``False``.
-            'measure_codes'     (*list* or *str*) codenames of the measures to calculate. Options are ``'discord_G'`` for Gaussian quantum discord [3]_, ``'entan_ln'`` for quantum entanglement (using matrix multiplications, fallback) [1]_, ``'entan_ln_2'`` for quantum entanglement (using analytical expressions) [2]_, ``'sync_c'`` for complete quantum synchronization [4]_, ``'sync_p'`` for quantum phase synchronization [4]_]). Default is ``['entan_ln']``.
+            'measure_codes'     (*list* or *str*) codenames of the measures to calculate. Options are ``'discord_G'`` for Gaussian quantum discord [3]_, ``'entan_ln'`` for quantum entanglement (using matrix multiplications, fallback) [1]_, ``'entan_ln_2'`` for quantum entanglement (using analytical expressions) [2]_, ``'sync_c'`` for complete quantum synchronization [5]_, ``'sync_p'`` for quantum phase synchronization [5]_). Default is ``['entan_ln']``.
             'indices'           (*list* or *tuple*) indices of the modes as a list or tuple of two integers. Default is ``(0, 1)``.
             ================    ====================================================
     cb_update : callable, optional
@@ -630,6 +629,7 @@ def get_Wigner_distributions_single_mode(Corrs, params, cb_update=None):
         Quadrature quadrature correlations with shape ``(dim, 2 * num_modes, 2 * num_modes)``.
     params : dict
         Parameters of the solver. Available options are:
+
         ================    ====================================================
         key                 value
         ================    ====================================================
@@ -719,6 +719,7 @@ def get_Wigner_distributions_two_mode(Corrs, params, cb_update=None):
         Quadrature quadrature correlations with shape ``(dim, 2 * num_modes, 2 * num_modes)``.
     params : dict
         Parameters of the solver. Available options are:
+
         ================    ====================================================
         key                 value
         ================    ====================================================

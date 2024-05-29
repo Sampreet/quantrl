@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.deterministic'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-04-03"
+__updated__ = "2024-05-29"
 
 # quantrl modules
 from .base import BaseGymEnv, BaseSB3Env
@@ -64,6 +64,7 @@ class LinearizedHOEnv(BaseGymEnv):
         Prefix of the directory where the data will be stored.
     kwargs: dict, optional
         Keyword arguments. Refer to the ``kwargs`` parameter of :class:`quantrl.envs.base.BaseEnv` for available options. Additional options are:
+
         ============    ================================================
         key             value
         ============    ================================================
@@ -500,6 +501,7 @@ class LinearizedHOVecEnv(BaseSB3Env):
         Prefix of the directory where the data will be stored.
     kwargs: dict
         Keyword arguments. Refer to the ``kwargs`` parameter of :class:`quantrl.envs.base.BaseEnv` for available options. Additional options are:
+
         ============    ================================================
         key             value
         ============    ================================================
