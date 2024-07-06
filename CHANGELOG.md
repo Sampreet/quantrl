@@ -1,5 +1,12 @@
 # Changelog
 
+## 2024/07/06 - 00 - v0.0.7 - Add Callback Util
+* Fixed plot buffer update in `quantrl.envs.base` module.
+* Added garbage collection in ``quantrl.io.FileIO`` class.
+* Support for more plots in ``quantrl.plotters.TrajectoryPlotter`` class.
+* Added `quantrl.utils` module for utility functions.
+* Updated `README`, `requirements` and `setup`.
+
 ## 2024/05/29 - 00 - v0.0.7 - Added Documentation
 * Added documentation for all modules.
 * Added ``uniform``, ``norm``, ``if_else`` and ``argmax`` methods in ``quantrl.backends`` package.

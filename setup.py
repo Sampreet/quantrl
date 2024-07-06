@@ -26,7 +26,7 @@ setup(
     install_requires=[
         'gymnasium',
         'matplotlib',
-        'numpy',
+        'numpy<2.0.0',
         'scipy',
         'stable-baselines3',
         'tqdm'

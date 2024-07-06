@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-05-29"
+__updated__ = "2024-06-01"
 
 # dependencies
 from abc import ABC, abstractmethod
@@ -611,7 +611,7 @@ class BaseEnv(ABC):
                 xs=self.T_norm,
                 Y=replay_data[i],
                 traj_idx=idx_start + i,
-                update_buffer=self.plot_buffer
+                update_buffer=True
             )
         # make gif
         if make_gif:

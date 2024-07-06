@@ -6,10 +6,11 @@
 __name__    = 'quantrl.plotters'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-12-08"
-__updated__ = "2024-02-29"
+__updated__ = "2024-05-30"
 
 # dependencies
 from io import BytesIO
+from matplotlib.gridspec import GridSpec
 from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
@@ -77,6 +78,7 @@ class TrajectoryPlotter(object):
         # initialize variables
         self.axes_rows = int(np.ceil(len(self.axes_args) / self.axes_cols))
         self.fig = plt.figure(figsize=(6.0 * self.axes_cols, 3.0 * self.axes_rows))
+        self.gspec = GridSpec(self.axes_rows, self.axes_cols, figure=self.fig, width_ratios=[0.2] * self.axes_cols)
         self.axes = list()
         self.lines = None
 
@@ -86,7 +88,7 @@ class TrajectoryPlotter(object):
                 if i * self.axes_cols + j >= len(self.axes_args):
                     break
                 # new subplot
-                ax = self.fig.add_subplot(int(self.axes_rows * 100 + self.axes_cols * 10 + i * self.axes_cols + j + 1))
+                ax = self.fig.add_subplot(self.gspec[i, j])
                 ax_args = self.axes_args[i * self.axes_cols + j]
                 # y-axis label, limits and scale
                 ax.set_xlabel(ax_args[0])
@@ -150,6 +152,9 @@ class TrajectoryPlotter(object):
         if self.save_dir is not None:
             self.save_plot(
                 file_name=self.save_dir + '/traj_' + str(traj_idx)
+            )
+            self.save_plot(
+                file_name=self.save_dir + '_latest'
             )
 
     def make_gif(self,

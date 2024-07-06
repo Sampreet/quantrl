@@ -6,12 +6,12 @@
 __name__    = 'quantrl.io'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-12-07"
-__updated__ = "2024-03-22"
+__updated__ = "2024-06-02"
 
 # dependencies
-from copy import deepcopy
 from threading import Thread
-from tqdm import tqdm
+from tqdm.rich import tqdm
+import gc
 import numpy as np
 import os
 
@@ -76,9 +76,11 @@ class FileIO(object):
             str(part_idx)
         ]) + '.npz', data))
         thread.start()
+        thread.join()
 
         # clear cache
         del data
+        gc.collect()
 
     def update_cache(self,
         data:np.ndarray
@@ -126,6 +128,7 @@ class FileIO(object):
         # clear cache
         del self.cache
         self.cache = None
+        gc.collect()
 
     def get_disk_cache(self,
         idx_start:int=0,
@@ -160,9 +163,10 @@ class FileIO(object):
                 idx_start=i,
                 idx_end=_idx_e
             )
-            self.cache_list += [deepcopy(_cache[:, :, idxs]) if idxs is not None else deepcopy(_cache)]
+            self.cache_list += [_cache[:, :, idxs].copy() if idxs is not None else _cache.copy()]
             # clear loaded cache
             del _cache
+            gc.collect()
 
         return np.concatenate(self.cache_list)[idx_start % self.cache_dump_interval:]
 
