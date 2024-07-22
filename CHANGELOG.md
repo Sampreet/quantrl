@@ -1,5 +1,13 @@
 # Changelog
 
+## 2027/07/22 - 00 - v0.0.7 - Fix Seed and Add Plotter
+* Added entropy-based seed sequencing for generators in `quantrl.backends` package.
+* Minor fixes to `quantrl.envs.base` module
+* Added option to save and load files directly using ``quantrl.io.FileIO`` class.
+* Added ``quantrl.plotters.LearningCurvePlotter`` class to plot learning curves directly.
+* Added option for averaging and saving in ``quantrl.utils.SaveOnBestMeanRewardCallback`` class.
+* Updated `docs` and `CONTRIBUTING`.
+
 ## 2024/07/06 - 00 - v0.0.7 - Add Callback Util
 * Fixed plot buffer update in `quantrl.envs.base` module.
 * Added garbage collection in ``quantrl.io.FileIO`` class.
@@ -9,7 +17,7 @@
 
 ## 2024/05/29 - 00 - v0.0.7 - Added Documentation
 * Added documentation for all modules.
-* Added ``uniform``, ``norm``, ``if_else`` and ``argmax`` methods in ``quantrl.backends`` package.
+* Added ``uniform``, ``norm``, ``if_else`` and ``argmax`` methods in `quantrl.backends` package.
 * Updated `quantrl.envs` package:
     * Update default parameters and added option to buffer plots in ``base.BaseEnv`` class.
     * Added option to cache only the properties in ``base.BaseEnv`` class.
@@ -18,7 +26,7 @@
 * Added `CODE_OF_CONDUCT`, `CONTRIBUTING` and `LICENSE`.
 
 ## 2024/04/23 - 00 - v0.0.7 - Hotfix for PRNGs
-* Updated ``generator`` methods in ``quantrl.backends`` package.
+* Updated ``generator`` methods in `quantrl.backends` package.
 * Updated `quantrl.envs.base` module:
     * Added ``seed`` parameter to ``BaseEnv`` class.
     * Initialized states, observations, properties and results, and made removed environment validation during initialization of ``BaseGymEnv`` and ``BaseSB3Env`` classes.

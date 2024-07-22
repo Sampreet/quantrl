@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.torch'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-04-25"
+__updated__ = "2024-07-22"
 
 # dependencies
 import numpy as np
@@ -35,8 +35,8 @@ class TorchBackend(BaseBackend):
         torch.set_default_device(device)
         self.device = device
 
-        # set seed
-        self.seed = None
+        # set seeder
+        self.seeder = None
 
     def convert_to_typed(self,
         tensor,
@@ -63,14 +63,14 @@ class TorchBackend(BaseBackend):
     def generator(self,
         seed:int=None
     ) -> torch.Generator:
-        if self.seed is not None:
-            self.seed += 1
-        elif seed is not None:
-            self.seed = seed
-        else:
-            self.seed = np.random.randint(1000)
+        if self.seeder is None:
+            if seed is None:
+                entropy = np.random.randint(1234567890)
+            else:
+                entropy = np.random.default_rng(seed).integers(0, 1234567890, (1, ))[0]
+            self.seeder = np.random.SeedSequence(entropy)
         generator = torch.Generator(device=self.device)
-        generator.manual_seed(self.seed)
+        generator.manual_seed(self.seeder.spawn(1)[0])
         return generator
 
     def integers(self,

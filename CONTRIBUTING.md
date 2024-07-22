@@ -49,7 +49,8 @@ ROOT_DIR/
 │   │
 │   ├───__init__.py
 │   ├───io.py
-│   └───plotters.py
+│   ├───plotters.py
+│   └───utils.py
 |
 ├───.gitignore
 ├───CHANGELOG.md

@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.numpy'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-04-25"
+__updated__ = "2024-07-22"
 
 # dependencies
 import numpy as np
@@ -24,8 +24,8 @@ class NumPyBackend(BaseBackend):
             tensor_type=np.ndarray,
             precision=precision
         )
-        # set seed
-        self.seed = None
+        # set seeder
+        self.seeder = None
 
     def convert_to_typed(self,
         tensor,
@@ -52,13 +52,13 @@ class NumPyBackend(BaseBackend):
     def generator(self,
         seed:int=None
     ) -> np.random.Generator:
-        if self.seed is not None:
-            self.seed += 1
-        elif seed is not None:
-            self.seed = seed
-        else:
-            self.seed = np.random.randint(1000)
-        return np.random.default_rng(self.seed)
+        if self.seeder is None:
+            if seed is None:
+                entropy = np.random.randint(1234567890)
+            else:
+                entropy = np.random.default_rng(seed).integers(0, 1234567890, (1, ))[0]
+            self.seeder = np.random.SeedSequence(entropy)
+        return np.random.default_rng(self.seeder.spawn(1)[0])
 
     def integers(self,
         generator:np.random.Generator,

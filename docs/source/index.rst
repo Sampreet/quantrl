@@ -17,6 +17,7 @@ Available Modules
    quantrl.solvers
    quantrl.io
    quantrl.plotters
+   quantrl.utils
 
 Indices and tables
 ==================

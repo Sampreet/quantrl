@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-06-01"
+__updated__ = "2024-07-22"
 
 # dependencies
 from abc import ABC, abstractmethod
@@ -20,7 +20,7 @@ import numpy as np
 # quantrl modules
 from ..backends.base import BaseBackend
 from ..io import FileIO
-from ..plotters import TrajectoryPlotter
+from ..plotters import TrajectoryPlotter, LearningCurvePlotter
 
 # TODO: Interface ConsoleIO
 # TODO: Support for different number of states and observables
@@ -208,7 +208,6 @@ class BaseEnv(ABC):
         )
         self.action_interval = action_interval
         self.action_steps = self.numpy_int(np.ceil((self.shape_T[0] - 1) / self.action_interval))
-        self.actions = None
 
         # align delay with action interval
         self.has_delay = kwargs['has_delay']
@@ -252,6 +251,13 @@ class BaseEnv(ABC):
                 show_title=True,
                 save_dir=self.file_path_prefix + '_plots'
             )
+
+        # initialize buffers
+        self.T_step = None
+        self.States = None
+        self.Observations = None
+        self.Reward = None
+        self.Properties = None
 
     @abstractmethod
     def _update_states(self):
@@ -491,8 +497,7 @@ class BaseEnv(ABC):
         data_rewards:np.ndarray=None,
         n_episodes:int=None,
         axis_args:list=None,
-        save_plot:bool=True,
-        hold:bool=True
+        hold:bool=False
     ):
         """Method to plot the learning curve.
 
@@ -506,9 +511,7 @@ class BaseEnv(ABC):
             Total number of episodes to load from cache.
         axis_args: list, default=None
             Axis properties. The first element is the ``x_label``, the second is ``y_label``, the third is ``[y_limit_min, y_limit_max]`` and the fourth is ``y_scale``.
-        save_plot: bool, default=True
-            Option to save the learning curve.
-        hold: bool, default=True
+        hold: bool, default=False
             Option to hold the plot.
         """
 
@@ -517,50 +520,44 @@ class BaseEnv(ABC):
 
         # extract frequently used variables
         _idx_s = 0
+        _idx_e = data_rewards.shape[0] - 1 if data_rewards is not None else n_episodes - 1
+        file_name = self.file_path_prefix + '_' + '_'.join([
+            'learning_curve',
+            str(_idx_s),
+            str(_idx_e)
+        ])
 
-        # get reward trajectory data
+        # get reward data from file
         if data_rewards is None:
-            _idx_e = n_episodes - 1
+            data_rewards = self.io.load_data(
+                file_name=file_name
+            )
+        # get reward data from trajectories
+        if data_rewards is None:
             data_rewards = self.io.get_disk_cache(
                 idx_start=_idx_s,
                 idx_end=_idx_e,
                 idxs=[-1]
-            )[:, -1, :]
-            _shape = data_rewards.shape
-        else:
-            _shape = data_rewards.shape
-            _idx_e = _shape[0] - 1
+            )[:, -1, 0]
 
-        # calculate average return and its standard deviation
-        assert _shape[0] >= self.average_over, "parameter ``average_over`` should be less than or equal to the total number of episodes"
-        return_avg = np.convolve(data_rewards[:, 0], np.ones((self.average_over, ), dtype=self.numpy_real) / self.numpy_real(self.average_over), mode='same').reshape(_shape)
-
-        # new plotter
-        plotter = TrajectoryPlotter(
-            axes_args=[axis_args if axis_args is not None and len(axis_args) == 4 else self.default_axis_args_learning_curve],
-            axes_lines_max=3,
-            axes_cols=1,
-            show_title=False
+        # initialize plotter
+        plotter = LearningCurvePlotter(
+            axis_args=axis_args if axis_args is not None and len(axis_args) == 4 else self.default_axis_args_learning_curve,
+            average_over=self.average_over
         )
-        # plot reward data
-        plotter.plot_lines(
-            xs=list(range(_shape[0])),
-            Y=data_rewards
-        )
-        # plot average return
-        plotter.plot_lines(
-            xs=list(range(_shape[0])),
-            Y=return_avg
+        # update plot
+        plotter.add_data(
+            data_rewards=data_rewards,
+            renew=False
         )
         # save plot
-        if save_plot:
-            plotter.save_plot(
-                file_name=self.file_path_prefix + '_' + '_'.join([
-                    'learning_curve',
-                    str(_idx_s),
-                    str(_idx_e)
-                ])
-            )
+        self.io.save_data(
+            data=data_rewards,
+            file_name=file_name
+        )
+        plotter.save_plot(
+            file_name=file_name
+        )
         # hold plot
         if hold:
             plotter.hold_plot()
@@ -572,7 +569,8 @@ class BaseEnv(ABC):
         n_episodes,
         idx_start:int=0,
         plot_interval:int=0,
-        make_gif:bool=True
+        make_gif:bool=True,
+        hold:bool=False
     ):
         """Method to replay trajectories in a given range.
 
@@ -624,7 +622,8 @@ class BaseEnv(ABC):
                 ])
             )
         # hold plot
-        self.plotter.hold_plot()
+        if hold:
+            self.plotter.hold_plot()
 
         # close plotter
         self.plotter.close()
@@ -657,7 +656,7 @@ class BaseEnv(ABC):
             self.plotter.close()
 
         # clean
-        del self.T, self.T_norm, self.T_step, self.actions, self.States, self.Observations, self.Reward
+        del self.T, self.T_norm, self.T_step, self.States, self.Observations, self.Reward
         if self.n_properties > 0:
             del self.Properties
         del self
@@ -707,6 +706,7 @@ class BaseGymEnv(BaseEnv, Env):
 
         # initialize buffers
         self.traj_idx = -1
+        self.actions = None
         self.States = self.backend.empty(
             shape=(self.action_interval + 1, self.n_observations),
             dtype='real'
@@ -723,7 +723,10 @@ class BaseGymEnv(BaseEnv, Env):
             shape=(self.action_interval + 1, ),
             dtype='real'
         )
+        self.rewards = None
         self.data_rewards = list()
+        self.all_data = None
+        self.data = None
 
     def validate_environment(self):
         return super().validate_environment(
@@ -966,6 +969,7 @@ class BaseGymEnv(BaseEnv, Env):
             # save learning curve
             self.plot_learning_curve(
                 data_rewards=_data_rewards.reshape((len(_data_rewards), 1)),
+                n_episodes=None,
                 axis_args=axis_args,
                 hold=False
             )
@@ -1048,6 +1052,7 @@ class BaseSB3Env(BaseEnv, VecEnv):
 
         # initialize buffers
         self.batch_idx = -1
+        self.actions = None
         self.States = self.backend.empty(
             shape=(self.action_interval + 1, self.n_envs, self.n_observations),
             dtype='real'
@@ -1341,7 +1346,7 @@ class BaseSB3Env(BaseEnv, VecEnv):
 
         # dump part data to disk
         if self.cache_all_data:
-            self.io.dump_part(
+            self.io.dump_part_async(
                 data=_data,
                 batch_idx=self.batch_idx,
                 part_idx=self.action_idx - 1
@@ -1449,6 +1454,7 @@ class BaseSB3Env(BaseEnv, VecEnv):
             )
             self.plot_learning_curve(
                 data_rewards=_data_rewards.reshape((_data_rewards.shape[0] * self.n_envs, 1)),
+                n_episodes=None,
                 axis_args=axis_args,
                 hold=False
             )

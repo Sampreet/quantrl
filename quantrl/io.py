@@ -6,7 +6,7 @@
 __name__    = 'quantrl.io'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-12-07"
-__updated__ = "2024-06-02"
+__updated__ = "2024-07-22"
 
 # dependencies
 from threading import Thread
@@ -52,12 +52,12 @@ class FileIO(object):
         self.cache = None
         self.index = -1
 
-    def dump_part(self,
+    def dump_part_async(self,
         data:np.ndarray,
         batch_idx:int,
         part_idx:int
     ):
-        """Method to dump a batch of data to disk.
+        """Method to dump a batch of data to disk asynchronously.
 
         Parameters
         ----------
@@ -102,16 +102,16 @@ class FileIO(object):
 
         # dump cache
         if self.index != 0 and (self.index + 1) % self.cache_dump_interval == 0:
-            self._dump_cache(
+            self._dump_cache_async(
                 idx_start=self.index - self.cache_dump_interval + 1,
                 idx_end=self.index
             )
 
-    def _dump_cache(self,
+    def _dump_cache_async(self,
         idx_start:int,
         idx_end:int
     ):
-        """Method to dump cache to disk.
+        """Method to dump cache to disk asynchronously.
 
         Parameters
         ----------
@@ -187,6 +187,42 @@ class FileIO(object):
         # load part or single cache file
         return np.load(self.disk_cache_dir + '/' + str(idx_start) + '_' + (str(idx_end) if idx_end != -1 else '*') + '.npz')['arr_0']
 
+    def save_data(self,
+        data:np.ndarray,
+        file_name:str
+    ):
+        """Method to save data to a file.
+
+        Parameters
+        ----------
+        data: :class:`numpy.ndarray`
+            Data to save.
+        file_name: str
+            Name of the file.
+        """
+
+        np.savez_compressed(file_name + '.npz', data)
+
+    def load_data(self,
+        file_name:str
+    ):
+        """Method to load data from a file.
+
+        Parameters
+        ----------
+        file_name: str
+            Name of the file.
+
+        Returns
+        -------
+        data: :class:`numpy.ndarray`
+            Data loaded from the file. Returns `None` if the file does not exist.
+        """
+
+        if os.path.isfile(file_name + '.npz'):
+            return np.load(file_name + '.npz')['arr_0']
+        return None
+
     def close(self,
         dump_cache=True
     ):
@@ -200,7 +236,7 @@ class FileIO(object):
 
         if dump_cache and self.cache is not None:
             _idx_s = self.index - (self.index + 1) % self.cache_dump_interval + 1
-            self._dump_cache(
+            self._dump_cache_async(
                 idx_start=_idx_s,
                 idx_end=_idx_s + self.cache_dump_interval - 1
             )
