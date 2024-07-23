@@ -6,7 +6,7 @@
 __name__    = 'quantrl.plotters'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-12-08"
-__updated__ = "2024-07-22"
+__updated__ = "2024-07-23"
 
 # dependencies
 from io import BytesIO
@@ -243,7 +243,7 @@ class LearningCurvePlotter(object):
         average_over:int=100,
         percentiles:list=[25, 50, 75]
     ):
-        """Class constructor for IQRPlotter."""
+        """Class constructor for LearningCurvePlotter."""
 
         # set attributes
         self.axis_args = axis_args
@@ -271,7 +271,8 @@ class LearningCurvePlotter(object):
         data_rewards:np.ndarray,
         renew:bool=False,
         color:str='k',
-        style:str='-'
+        style:str='-',
+        width:float=1.5
     ):
         """Method to add reward data.
 
@@ -285,11 +286,13 @@ class LearningCurvePlotter(object):
             Line color of the plot.
         style: str, default='-'
             Line style of the plot.
+        width: float, default=1.5
+            Line width of the plot.
         """
 
         # if averaging opted
         if self.average_over is not None:
-            data_rewards_smooth = np.convolve(data_rewards, np.ones((self.average_over, )) / float(self.average_over), mode='same')
+            data_rewards_smooth = np.convolve(data_rewards, np.ones((self.average_over, )) / float(self.average_over), mode='valid')
 
         # update data
         if renew:
@@ -301,12 +304,12 @@ class LearningCurvePlotter(object):
             self.line_faint.remove()
         if self.line is not None:
             self.line.remove()
-        xs = list(range(len(self.data[0])))
+        xs = list(range(self.average_over, len(self.data[0]) + self.average_over))
 
         # if single entry
         if len(self.data) == 1:
             q_mean = data_rewards_smooth
-            self.line_faint = self.ax.plot(xs, data_rewards, c=color, alpha=0.1, linewidth=0.5)[0]
+            self.line_faint = self.ax.plot(xs, data_rewards[self.average_over - 1:], c=color, alpha=0.1, linewidth=0.5)[0]
         else:
             # if interquartile ranges given
             if self.percentiles is not None:
@@ -318,7 +321,7 @@ class LearningCurvePlotter(object):
                 self.line_faint = self.ax.plot(xs, q_mean, c=color, alpha=0.1, linewidth=0.5)[0]
 
         # add new lines
-        self.line = self.ax.plot(xs, q_mean, c=color, linestyle=style, linewidth=1.5)[0]
+        self.line = self.ax.plot(xs, q_mean, c=color, linestyle=style, linewidth=width)[0]
 
     def save_plot(self,
         file_name:str

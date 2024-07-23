@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-07-22"
+__updated__ = "2024-07-23"
 
 # dependencies
 from abc import ABC, abstractmethod
@@ -968,7 +968,7 @@ class BaseGymEnv(BaseEnv, Env):
             )
             # save learning curve
             self.plot_learning_curve(
-                data_rewards=_data_rewards.reshape((len(_data_rewards), 1)),
+                data_rewards=_data_rewards.ravel(),
                 n_episodes=None,
                 axis_args=axis_args,
                 hold=False
@@ -1453,7 +1453,7 @@ class BaseSB3Env(BaseEnv, VecEnv):
                 dtype='real'
             )
             self.plot_learning_curve(
-                data_rewards=_data_rewards.reshape((_data_rewards.shape[0] * self.n_envs, 1)),
+                data_rewards=_data_rewards.ravel(),
                 n_episodes=None,
                 axis_args=axis_args,
                 hold=False

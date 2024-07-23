@@ -1,5 +1,9 @@
 # Changelog
 
+## 2027/07/23 - 00 - v0.0.7 - Fix Learning Curve Plotter
+* Fixed issue with learning curve data in `quantrl.envs.base` module.
+* Fixed averaging of reward data in ``quantrl.plotters.LearningCurvePlotter`` class.
+
 ## 2027/07/22 - 00 - v0.0.7 - Fix Seed and Add Plotter
 * Added entropy-based seed sequencing for generators in `quantrl.backends` package.
 * Minor fixes to `quantrl.envs.base` module
