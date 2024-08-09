@@ -28,6 +28,7 @@ setup(
         'matplotlib',
         'numpy<2.0.0',
         'scipy',
+        'seaborn'
         'stable-baselines3',
         'tqdm'
     ],

@@ -16,6 +16,7 @@
 * Added support for measurement noise in observations.
 * Updated stochastic environment for fast Wiener processes.
 * Asynchronous cache-dump to speed up environment evolution.
+* Callback to save best mean reward.
 
 ### What's New in v0.0.6
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2027/08/09 - 00 - v0.0.7 - Update Callback
+* Fixed issue with cache indexing in `quantrl.envs.base` module.
+* Updated best reward callback in `quantrl.utils` module.
+* Added `seaborn` to `requirements` and `setup`.
+
 ## 2027/07/23 - 00 - v0.0.7 - Fix Learning Curve Plotter
 * Fixed issue with learning curve data in `quantrl.envs.base` module.
 * Fixed averaging of reward data in ``quantrl.plotters.LearningCurvePlotter`` class.

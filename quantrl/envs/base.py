@@ -253,6 +253,7 @@ class BaseEnv(ABC):
             )
 
         # initialize buffers
+        self._idx_s = 0
         self.T_step = None
         self.States = None
         self.Observations = None
@@ -519,8 +520,8 @@ class BaseEnv(ABC):
         assert data_rewards is not None or n_episodes is not None, "either one of the parameters ``n_episodes`` or ``data_rewards`` should be provided"
 
         # extract frequently used variables
-        _idx_s = 0
-        _idx_e = data_rewards.shape[0] - 1 if data_rewards is not None else n_episodes - 1
+        _idx_s = self._idx_s
+        _idx_e = self._idx_s + data_rewards.shape[0] - 1 if data_rewards is not None else n_episodes - 1
         file_name = self.file_path_prefix + '_' + '_'.join([
             'learning_curve',
             str(_idx_s),
