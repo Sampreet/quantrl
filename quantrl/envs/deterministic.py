@@ -6,9 +6,11 @@
 __name__    = 'quantrl.envs.deterministic'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-05-29"
+__updated__ = "2024-10-09"
 
 # quantrl modules
+from ..backends.context_manager import get_backend_instance
+from ..solvers.context_manager import get_IVP_solver
 from .base import BaseGymEnv, BaseSB3Env
 
 # TODO: ABC for common processes
@@ -114,25 +116,14 @@ class LinearizedHOEnv(BaseGymEnv):
         assert backend_library in self.backend_libraries, "parameter ``solver_type`` should be one of ``{}``".format(self.backend_libraries)
 
         # select backend
-        if 'torch' in backend_library:
-            from ..backends.torch import TorchBackend
-            from ..solvers.torch import TorchDiffEqIVPSolver as IVPSolverClass
-            backend = TorchBackend(
-                precision=backend_precision,
-                device=backend_device
-            )
-        elif 'jax' in backend_library:
-            from ..backends.jax import JaxBackend
-            from ..solvers.jax import DiffraxIVPSolver as IVPSolverClass
-            backend = JaxBackend(
-                precision=backend_precision
-            )
-        else:
-            from ..backends.numpy import NumPyBackend
-            from ..solvers.numpy import SciPyIVPSolver as IVPSolverClass
-            backend = NumPyBackend(
-                precision=backend_precision
-            )
+        backend = get_backend_instance(
+            library=backend_library,
+            precision=backend_precision,
+            device=backend_device
+        )
+        IVPSolver = get_IVP_solver(
+            library=backend_library
+        )
 
         # set constants
         self.name = name
@@ -178,7 +169,7 @@ class LinearizedHOEnv(BaseGymEnv):
         )
 
         # initialize solver
-        self.solver = IVPSolverClass(
+        self.solver = IVPSolver(
             func=self.func,
             y_0=self.States[-1],
             T=self.T,

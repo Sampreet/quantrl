@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.numpy'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-07-22"
+__updated__ = "2024-10-09"
 
 # dependencies
 import numpy as np
@@ -20,6 +20,7 @@ class NumPyBackend(BaseBackend):
     ):
         # initialize BaseBackend
         super().__init__(
+            name='numpy',
             library=np,
             tensor_type=np.ndarray,
             precision=precision

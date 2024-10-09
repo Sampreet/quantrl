@@ -6,16 +6,15 @@
 __name__    = 'quantrl.envs.stochastic'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-05-29"
+__updated__ = "2024-10-09"
 
 # dependencies
-from time import time
 import numpy as np
 
 # quantrl modules
+from ..backends.context_manager import get_backend_instance
 from .base import BaseGymEnv
 
-# TODO: Add MCQT
 # TODO: Add delay feature
 # TODO: Release memory
 
@@ -100,22 +99,11 @@ class LinearEnv(BaseGymEnv):
         assert backend_library in self.backend_libraries, "parameter ``solver_type`` should be one of ``{}``".format(self.backend_libraries)
 
         # select backend
-        if 'torch' in backend_library:
-            from ..backends.torch import TorchBackend
-            backend = TorchBackend(
-                precision=backend_precision,
-                device=backend_device
-            )
-        elif 'jax' in backend_library:
-            from ..backends.jax import JaxBackend
-            backend = JaxBackend(
-                precision=backend_precision
-            )
-        else:
-            from ..backends.numpy import NumPyBackend
-            backend = NumPyBackend(
-                precision=backend_precision
-            )
+        backend = get_backend_instance(
+            library=backend_library,
+            precision=backend_precision,
+            device=backend_device
+        )
 
         # set constants
         self.name = name
@@ -188,7 +176,7 @@ class LinearEnv(BaseGymEnv):
 
     def _update_states(self):
         # initialize states
-        _States = self.backend.update(
+        _States = self.backend.jit_update(
             tensor=self.States,
             indices=0,
             values=self.States[-1]
@@ -236,19 +224,20 @@ class LinearEnv(BaseGymEnv):
             t_idx=self.t_idx + i,
             args=args
         )
-        # return updated states
-        return self.backend.update(
+        # get updated states
+        values = self.backend.jit_add(
+            tensor_0=self.backend.jit_matmul(
+                tensor_0=M_i,
+                tensor_1=Y[i],
+                out=self.matmul_0
+            ),
+            tensor_1=n_i * self.Ws[self.t_idx + i],
+            out=self.add_0
+        )
+        return self.backend.jit_update(
             tensor=Y,
             indices=i + 1,
-            values=self.backend.add(
-                tensor_0=self.backend.matmul(
-                    tensor_0=M_i,
-                    tensor_1=Y[i],
-                    out=self.matmul_0
-                ),
-                tensor_1=n_i * self.Ws[self.t_idx + i],
-                out=self.add_0
-            )
+            values=values
         )
 
     def get_A(self,

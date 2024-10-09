@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-05-29"
+__updated__ = "2024-10-09"
 
 # dependencies
 from abc import ABC, abstractmethod
@@ -17,15 +17,19 @@ class BaseBackend(ABC):
 
     Parameters
     ----------
+    name: str
+        Name of the backend.
     library: Any
-        Library used by the backend.
+        Numerical library used by the backend.
     tensor_type: Any
         Tensor type for the backend.
     precision: str, default='double'
         Precision of the numerical values in the backend. Options are ``'single'`` and ``'double'``.
     """
 
-    def __init__(self,
+    def __init__(
+        self,
+        name,
         library,
         tensor_type,
         precision:str='double'
@@ -34,6 +38,7 @@ class BaseBackend(ABC):
         assert precision in ['single', 'double'], "parameter ``precision`` can be either ``'single'`` or ``'double'``."
 
         # set attributes
+        self.name = name
         self.library = library
         self.tensor_type = tensor_type
         self.precision = precision
@@ -549,6 +554,30 @@ class BaseBackend(ABC):
         if dtype is None:
             dtype = 'real'
         return self.dtypes['numpy' if numpy else 'typed'][self.precision][dtype]
+    
+    def jit_transpose(self, tensor, axis_0, axis_1):
+        return self.transpose(tensor, axis_0, axis_1)
+    
+    def jit_repeat(self, tensor, repeats, axis):
+        return self.repeat(tensor, repeats, axis)
+    
+    def jit_add(self, tensor_0, tensor_1, out):
+        return self.add(tensor_0, tensor_1, out=out)
+    
+    def jit_matmul(self, tensor_0, tensor_1, out):
+        return self.matmul(tensor_0, tensor_1, out)
+    
+    def jit_dot(self, tensor_0, tensor_1, out):
+        return self.dot(tensor_0, tensor_1, out)
+    
+    def jit_concatenate(self, tensors, axis, out):
+        return self.concatenate(tensors, axis, out)
+    
+    def jit_stack(self, tensors, axis, out):
+        return self.stack(tensors, axis, out)
+    
+    def jit_update(self, tensor, indices, values):
+        return self.update(tensor, indices, values)
 
     def empty(self,
         shape:tuple,

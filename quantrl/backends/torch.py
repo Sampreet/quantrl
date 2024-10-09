@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.torch'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-07-22"
+__updated__ = "2024-10-09"
 
 # dependencies
 import numpy as np
@@ -22,6 +22,7 @@ class TorchBackend(BaseBackend):
     ):
         # initialize BaseBackend
         super().__init__(
+            name='torch',
             library=torch,
             tensor_type=torch.Tensor,
             precision=precision
