@@ -19,7 +19,7 @@ keywords = [
     "python3",
 ]
 readme = "README.md"
-license = {file = "LICENSE.txt"}
+license = {file = "LICENSE"}
 requires-python = ">=3.10"
 dependencies = [
     "numpy<2.0.0",
