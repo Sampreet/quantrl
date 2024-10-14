@@ -1,0 +1,87 @@
+[build-system]
+requires = ["cython", "setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+dynamic = ["version"]
+name = "quantrl"
+authors = [
+    {name = "Sampreet Kalita", email = "9553215+Sampreet@users.noreply.github.com"},
+]
+maintainers = [
+    {name = "Sampreet Kalita", email = "9553215+Sampreet@users.noreply.github.com"},
+]
+description = "Quantum Control with Reinforcement Learning"
+keywords = [
+    "quantum",
+    "toolbox",
+    "reinforcement learning",
+    "python3",
+]
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.10"
+dependencies = [
+    "numpy<2.0.0",
+    "scipy",
+    "matplotlib",
+    "tqdm",
+    "pillow",
+    "pandas",
+    "gymnasium",
+    "stable-baselines3",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
+]
+
+[project.optional-dependencies]
+jax-cpu = [
+    "jax",
+    "diffrax",
+]
+jax-gpu = [
+    "jax[cuda12]",
+    "diffrax",
+]
+torch = [
+    "torch",
+    "torchvision",
+    "torchaudio",
+    "torchdiffeq",
+]
+
+[project.urls]
+Homepage = "https://github.com/sampreet/quantrl"
+Repository = "https://github.com/sampreet/quantrl"
+Issues = "https://github.com/sampreet/quantrl/issues"
+Changelog = "https://github.com/sampreet/quantrl/blob/master/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+include = ["quantrl"]
+namespaces = false
+
+[tool.setuptools.dynamic]
+version = {attr = "quantrl.__version__"}
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+requires =
+    tox>=4
+    virtualenv>=20
+env_list =
+    lint
+
+[testenv:lint]
+description = run pylint under {base_python}
+deps =
+    -r requirements_tox.txt
+commands =
+    pylint quantrl
+"""

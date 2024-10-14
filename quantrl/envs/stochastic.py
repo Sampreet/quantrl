@@ -6,16 +6,15 @@
 __name__    = 'quantrl.envs.stochastic'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-05-29"
+__updated__ = "2024-10-14"
 
 # dependencies
-from time import time
 import numpy as np
 
 # quantrl modules
+from ..backends.context_manager import get_backend_instance
 from .base import BaseGymEnv
 
-# TODO: Add MCQT
 # TODO: Add delay feature
 # TODO: Release memory
 
@@ -69,7 +68,7 @@ class LinearEnv(BaseGymEnv):
         Keyword arguments. Refer to the ``kwargs`` parameter of :class:`quantrl.envs.base.BaseEnv` for available options.
     """
 
-    default_params = dict()
+    default_params = {}
     """dict: Default parameters of the environment."""
 
     backend_libraries = ['torch', 'jax', 'numpy']
@@ -90,42 +89,32 @@ class LinearEnv(BaseGymEnv):
         data_idxs:list,
         backend_library:str='numpy',
         backend_precision:str='double',
-        backend_device:str='cuda',
+        backend_device:str='gpu',
         dir_prefix:str='data',
         **kwargs
     ):
         """Class constructor for LinearEnv."""
 
         # validate arguments
-        assert backend_library in self.backend_libraries, "parameter ``solver_type`` should be one of ``{}``".format(self.backend_libraries)
+        assert backend_library in self.backend_libraries, f"parameter ``solver_type`` should be one of ``{self.backend_libraries}``"
 
         # select backend
-        if 'torch' in backend_library:
-            from ..backends.torch import TorchBackend
-            backend = TorchBackend(
-                precision=backend_precision,
-                device=backend_device
-            )
-        elif 'jax' in backend_library:
-            from ..backends.jax import JaxBackend
-            backend = JaxBackend(
-                precision=backend_precision
-            )
-        else:
-            from ..backends.numpy import NumPyBackend
-            backend = NumPyBackend(
-                precision=backend_precision
-            )
+        backend = get_backend_instance(
+            library=backend_library,
+            precision=backend_precision,
+            device=backend_device
+        )
 
         # set constants
         self.name = name
         self.desc = desc
 
         # set parameters
-        self.params = dict()
-        for key in self.default_params:
+        self.params = {}
+        for key, _ in self.default_params.items():
             self.params[key] = params.get(key, self.default_params[key])
         # set buffers
+        self.Ws = None
         self.I = backend.eye(
             N=n_observations,
             dtype='real'
@@ -149,7 +138,7 @@ class LinearEnv(BaseGymEnv):
             action_interval=action_interval,
             data_idxs=data_idxs,
             dir_prefix=(dir_prefix if dir_prefix != 'data' else ('data/' + self.name.lower()) + '/env') + '_' + '_'.join([
-                str(self.params[key]) for key in self.params
+                str(val) for _, val in self.params.items()
             ]),
             file_prefix='lin_env',
             **kwargs
@@ -188,7 +177,7 @@ class LinearEnv(BaseGymEnv):
 
     def _update_states(self):
         # initialize states
-        _States = self.backend.update(
+        _States = self.backend.jit_update(
             tensor=self.States,
             indices=0,
             values=self.States[-1]
@@ -236,19 +225,20 @@ class LinearEnv(BaseGymEnv):
             t_idx=self.t_idx + i,
             args=args
         )
-        # return updated states
-        return self.backend.update(
+        # get updated states
+        values = self.backend.jit_add(
+            tensor_0=self.backend.jit_matmul(
+                tensor_0=M_i,
+                tensor_1=Y[i],
+                out=self.matmul_0
+            ),
+            tensor_1=n_i * self.Ws[self.t_idx + i],
+            out=self.add_0
+        )
+        return self.backend.jit_update(
             tensor=Y,
             indices=i + 1,
-            values=self.backend.add(
-                tensor_0=self.backend.matmul(
-                    tensor_0=M_i,
-                    tensor_1=Y[i],
-                    out=self.matmul_0
-                ),
-                tensor_1=n_i * self.Ws[self.t_idx + i],
-                out=self.add_0
-            )
+            values=values
         )
 
     def get_A(self,

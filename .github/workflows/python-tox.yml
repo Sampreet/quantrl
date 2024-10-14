@@ -1,0 +1,52 @@
+name: tox
+
+on: [
+  push,
+  pull_request,
+]
+
+jobs:
+  build:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [
+          ubuntu-latest,
+          macos-latest,
+          windows-latest,
+        ]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Install package
+        run: pip install -e .
+
+  test:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: [
+          "3.10",
+          "3.12",
+        ]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: "pip"
+      - name: Install tox
+        run: pip install tox
+      - name: Run tox
+        run: tox

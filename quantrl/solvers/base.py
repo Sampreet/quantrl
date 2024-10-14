@@ -6,10 +6,11 @@
 __name__    = 'quantrl.solvers.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-05-29"
+__updated__ = "2024-10-14"
 
 # dependencies
 from abc import ABC, abstractmethod
+
 from tqdm import tqdm
 
 # quantrl modules
@@ -55,6 +56,7 @@ class BaseIVPSolver(ABC):
     ..note: In the presence of delay, the parameter ``'step_interval'`` is overriden by the delay interval.
     """
 
+    # attributes
     default_solver_params = {
         'method': 'vode',
         'atol': 1e-12,
@@ -64,6 +66,8 @@ class BaseIVPSolver(ABC):
         'complex': False
     }
     """dict: Default parameters of the solver."""
+    solver_methods = []
+    """list: Methods used by the solver."""
 
     def __init__(self,
         func,
@@ -100,20 +104,20 @@ class BaseIVPSolver(ABC):
         )
 
         # set params
-        self.solver_params = dict()
-        for key in self.default_solver_params:
+        self.solver_params = {}
+        for key, _ in self.default_solver_params.items():
             self.solver_params[key] = solver_params.get(key, self.default_solver_params[key])
         # override step dimension with delay interval if DDE
         if self.has_delay and self.delay_interval != 0:
             self.solver_params['step_interval'] = self.delay_interval
 
         # validate params
-        assert self.solver_params['method'] in self.solver_methods, "parameter ``method`` should be one of ``{}``".format(self.solver_methods)
-        assert type(self.solver_params['step_interval']) is int and self.solver_params['step_interval'] < self.shape_T[0], "parameter ``step_interval`` should be an integer with a value less than the total number of steps"
+        assert self.solver_params['method'] in self.solver_methods, f"parameter ``method`` should be one of ``{self.solver_methods}``"
+        assert isinstance(self.solver_params['step_interval'], int) and self.solver_params['step_interval'] < self.shape_T[0], "parameter ``step_interval`` should be an integer with a value less than the total number of steps"
 
         # step constants
         self.step_interval = self.solver_params['step_interval']
-    
+
     @abstractmethod
     def integrate(self,
         T_step,
@@ -138,7 +142,7 @@ class BaseIVPSolver(ABC):
         """
 
         raise NotImplementedError
-    
+
     @abstractmethod
     def interpolate(self,
         T_step,
@@ -193,7 +197,7 @@ class BaseIVPSolver(ABC):
         # update delay function
         if self.has_delay:
             self.func_delay = self.interpolate(
-                T=T_step,
+                T_step=T_step,
                 Y=_Y
             )
 

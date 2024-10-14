@@ -6,19 +6,20 @@
 __name__    = 'quantrl.io'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-12-07"
-__updated__ = "2024-07-22"
+__updated__ = "2024-10-14"
 
 # dependencies
-from threading import Thread
-from tqdm.rich import tqdm
 import gc
-import numpy as np
 import os
+from threading import Thread
+
+from tqdm.rich import tqdm
+import numpy as np
 
 # TODO: Implement ConsoleIO
 # TODO: Add ``load_parts`` method
 
-class FileIO(object):
+class FileIO():
     """Handler for file input-output.
 
     Initializes ``cache`` to ``None`` and ``index`` to ``-1``.
@@ -40,7 +41,7 @@ class FileIO(object):
         """Class constructor for FileIO."""
 
         # set attributes
-        assert type(cache_dump_interval) is int and cache_dump_interval > 0, "parameter ``disk_cache_size`` should be a positive integer"
+        assert isinstance(cache_dump_interval, int) and cache_dump_interval > 0, "parameter ``disk_cache_size`` should be a positive integer"
         self.disk_cache_dir = disk_cache_dir
         self.cache_dump_interval = cache_dump_interval
         try:
@@ -148,7 +149,7 @@ class FileIO(object):
         """
 
         # iterate over parts
-        self.cache_list = list()
+        cache_list = []
         for i in tqdm(
             range(int(idx_start / self.cache_dump_interval) * self.cache_dump_interval, idx_end + 1, self.cache_dump_interval),
             desc="Loading",
@@ -163,12 +164,12 @@ class FileIO(object):
                 idx_start=i,
                 idx_end=_idx_e
             )
-            self.cache_list += [_cache[:, :, idxs].copy() if idxs is not None else _cache.copy()]
+            cache_list += [_cache[:, :, idxs].copy() if idxs is not None else _cache.copy()]
             # clear loaded cache
             del _cache
             gc.collect()
 
-        return np.concatenate(self.cache_list)[idx_start % self.cache_dump_interval:]
+        return np.concatenate(cache_list)[idx_start % self.cache_dump_interval:]
 
     def _load_cache(self,
         idx_start:int,

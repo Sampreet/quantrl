@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.numpy'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-07-22"
+__updated__ = "2024-10-13"
 
 # dependencies
 import numpy as np
@@ -15,29 +15,31 @@ import numpy as np
 from .base import BaseBackend
 
 class NumPyBackend(BaseBackend):
+    """Backend to interface the NumPy library.
+
+    Parameters
+    ----------
+    precision: str, default='double'
+        Precision of the numerical values in the backend. Options are ``'single'`` and ``'double'``.
+    """
     def __init__(self,
         precision:str='double'
     ):
         # initialize BaseBackend
         super().__init__(
+            name='numpy',
             library=np,
             tensor_type=np.ndarray,
             precision=precision
         )
-        # set seeder
-        self.seeder = None
 
     def convert_to_typed(self,
         tensor,
         dtype:str=None
     ) -> np.ndarray:
-        if self.is_typed(
-            tensor=tensor,
-            dtype=dtype
-        ):
-            return tensor
-        return np.array(tensor, dtype=self.dtype_from_str(
-            dtype=dtype
+        return np.asarray(tensor, dtype=self.dtype_from_str(
+            dtype=dtype,
+            numpy=True
         ) if dtype is not None else None)
 
     def convert_to_numpy(self,
@@ -52,13 +54,9 @@ class NumPyBackend(BaseBackend):
     def generator(self,
         seed:int=None
     ) -> np.random.Generator:
-        if self.seeder is None:
-            if seed is None:
-                entropy = np.random.randint(1234567890)
-            else:
-                entropy = np.random.default_rng(seed).integers(0, 1234567890, (1, ))[0]
-            self.seeder = np.random.SeedSequence(entropy)
-        return np.random.default_rng(self.seeder.spawn(1)[0])
+        if self.seed_sequence is None:
+            self.seed_sequence = self.get_seedsequence(seed)
+        return np.random.default_rng(self.seed_sequence.spawn(1)[0])
 
     def integers(self,
         generator:np.random.Generator,
@@ -98,18 +96,18 @@ class NumPyBackend(BaseBackend):
         axis_0:int=None,
         axis_1:int=None
     ) -> np.ndarray:
-        _shape = self.shape(
-            tensor=tensor
-        )
-        _axes = np.arange(len(_shape))
-        if axis_0 is not None and axis_1 is not None:
-            _axes[axis_1] = axis_0 % len(_shape)
-            _axes[axis_0] = axis_1 % len(_shape)
-            return np.transpose(tensor, axes=_axes)
-        else:
+        if axis_0 is None or axis_1 is None:
             return self.convert_to_typed(
                 tensor=tensor
             ).T
+
+        # get swapped axes
+        _shape = np.shape(tensor)
+        _axes = np.arange(len(_shape))
+        _axes[axis_1] = axis_0 % len(_shape)
+        _axes[axis_0] = axis_1 % len(_shape)
+
+        return np.transpose(tensor, axes=_axes)
 
     def repeat(self,
         tensor,
@@ -158,7 +156,7 @@ class NumPyBackend(BaseBackend):
         out
     ) -> np.ndarray:
         return np.stack(tensors, axis=axis, out=out)
-    
+
     def update(self,
         tensor,
         indices,
@@ -166,7 +164,7 @@ class NumPyBackend(BaseBackend):
     ) -> np.ndarray:
         tensor[indices] = values
         return tensor
-    
+
     def if_else(self,
         condition,
         func_true,

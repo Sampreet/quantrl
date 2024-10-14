@@ -6,11 +6,11 @@
 __name__    = 'quantrl.solvers.numpy'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-03-23"
+__updated__ = "2024-10-14"
 
 # dependencies
-from scipy.interpolate import splev, splrep
 import scipy.integrate as si
+from scipy.interpolate import splev, splrep
 
 # quantrl modules
 from ..backends.numpy import NumPyBackend
@@ -159,7 +159,7 @@ class SciPyIVPSolver(BaseIVPSolver):
             self.integrator.set_f_params(args)
             for i in range(1, len(T_step)):
                 _Y_flat[i] = self.integrator.integrate(T_step[i])
-        
+
         # integrate using Python-based solvers
         else:
             _Y_flat = self.backend.transpose(
@@ -176,7 +176,7 @@ class SciPyIVPSolver(BaseIVPSolver):
             )
 
         return _Y_flat
-    
+
     def interpolate(self,
         T_step,
         Y

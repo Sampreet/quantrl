@@ -6,15 +6,16 @@
 __name__    = 'quantrl.plotters'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-12-08"
-__updated__ = "2024-07-23"
+__updated__ = "2024-10-14"
 
 # dependencies
 from io import BytesIO
+import os
+
 from matplotlib.gridspec import GridSpec
-from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
-import os
+from PIL import Image
 
 # OpenMP configuration
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
@@ -35,7 +36,7 @@ plt.rcParams['axes.labelsize'] = 16
 plt.rcParams['xtick.labelsize'] = 14
 plt.rcParams['ytick.labelsize'] = 14
 
-class TrajectoryPlotter(object):
+class TrajectoryPlotter():
     """Plotter for trajectories.
 
     Initializes ``axes_rows``, ``fig``, ``axes`` and ``lines``.
@@ -88,7 +89,7 @@ class TrajectoryPlotter(object):
         self.axes_rows = int(np.ceil(len(self.axes_args) / self.axes_cols))
         self.fig = plt.figure(figsize=(6.0 * self.axes_cols, 3.0 * self.axes_rows))
         self.gspec = GridSpec(self.axes_rows, self.axes_cols, figure=self.fig, width_ratios=[0.2] * self.axes_cols)
-        self.axes = list()
+        self.axes = []
         self.lines = None
 
         # format frame
@@ -112,7 +113,7 @@ class TrajectoryPlotter(object):
         self.fig.tight_layout()
 
         # initialize buffers
-        self.frames = list()
+        self.frames = []
 
     def plot_lines(self,
         xs,
@@ -140,13 +141,13 @@ class TrajectoryPlotter(object):
                 line.set_alpha(0.1)
 
         # add new lines
-        self.lines = list()
+        self.lines = []
         for i, ax in enumerate(self.axes):
             if self.axes_lines_max and len(ax.get_lines()) >= self.axes_lines_max:
                 line = ax.get_lines()[0]
                 line.remove()
             self.lines.append(ax.plot(xs, Y[:, i])[0])
-        if self.show_title and self.fig._suptitle is not None:
+        if self.show_title:
             self.fig.suptitle('#' + str(traj_idx))
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
@@ -187,7 +188,7 @@ class TrajectoryPlotter(object):
 
         # reset buffer
         del self.frames
-        self.frames = list()
+        self.frames = []
 
     def save_plot(self,
         file_name:str
@@ -223,7 +224,7 @@ class TrajectoryPlotter(object):
         # clean
         del self
 
-class LearningCurvePlotter(object):
+class LearningCurvePlotter():
     """Plotter for learning curve.
 
     Initializes ``fig``, ``ax`` and ``data``.
@@ -234,21 +235,21 @@ class LearningCurvePlotter(object):
         Lists of axis properties. The first element of each entry is the ``x_label``, the second is ``y_label``, the third is ``[y_limit_min, y_limit_max]`` and the fourth is ``y_scale``.
     average_over: int, default=100
         Number of points to average over.
-    percentiles: list, default=[25, 50, 75]
-        Percentile values for intraquartile ranges.
+    percentiles: list, default=None
+        Percentile values for intraquartile ranges. If ``None``, the percentiles are set to ``[25, 50, 75]``.
     """
 
     def __init__(self,
         axis_args:list,
         average_over:int=100,
-        percentiles:list=[25, 50, 75]
+        percentiles:list=None
     ):
         """Class constructor for LearningCurvePlotter."""
 
         # set attributes
         self.axis_args = axis_args
         self.average_over = average_over
-        self.percentiles = percentiles
+        self.percentiles = percentiles if percentiles is not None else [25, 50, 75]
 
         # turn on interactive mode
         plt.ion()
@@ -263,7 +264,7 @@ class LearningCurvePlotter(object):
         self.fig.tight_layout()
 
         # initialze buffer
-        self.data = list()
+        self.data = []
         self.line = None
         self.line_faint = None
 
@@ -291,12 +292,13 @@ class LearningCurvePlotter(object):
         """
 
         # if averaging opted
+        data_rewards_smooth = data_rewards
         if self.average_over is not None:
             data_rewards_smooth = np.convolve(data_rewards, np.ones((self.average_over, )) / float(self.average_over), mode='valid')
 
         # update data
         if renew:
-            self.data = list()
+            self.data = []
             self.line = None
             self.line_faint = None
         self.data.append(data_rewards_smooth)

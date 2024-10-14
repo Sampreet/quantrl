@@ -1,6 +1,6 @@
 # QuantRL: Quantum Control using Reinforcement Learning
 
-![Latest Version](https://img.shields.io/badge/version-0.0.7-red?style=for-the-badge)
+![Latest Version](https://img.shields.io/badge/version-0.0.8-red?style=for-the-badge)
 
 > A library of modules to interface deterministic and stochastic quantum models for reinforcement learning.
 
@@ -30,7 +30,7 @@ The toolbox primarily relies on `gymnasium` (for single environments) and `stabl
 All of its dependencies can be installed using:
 
 ```bash
-conda install "numpy<2.0.0" scipy matplotlib tqdm gymnasium stable-baselines3
+conda install "numpy<2.0.0" scipy matplotlib tqdm pillow pandas gymnasium stable-baselines3
 ```
 
 Additionally, to avail the PyTorch or JAX backends, the latest version of these framework (for both CPU and GPU) should be installed (preferably in different `conda` environments) using in their official documentations: [PyTorch docs](https://pytorch.org/get-started/locally/) and [JAX docs](https://jax.readthedocs.io/en/latest/installation.html).
@@ -43,14 +43,16 @@ pip install torchdiffeq
 or,
 
 ```bash
+pip install jax
 pip install diffrax
 ```
 
+To install JAX with GPU support, use `jax[cuda12]`.
+
 ***Note: JAX-GPU support for Windows and MacOS is still limited but it runs well in WSL2.***
 
-Finally, to install the latest version of `quantrl` locally, download the repository as `.zip` and extract the contents, or clone the repository.
-Now, execute the following from *outside* the top-level directory, `ROOT_DIR`, inside which `setup.py` is located as:
+Finally, to install the latest version of `quantrl`, execute:
 
 ```bash
-pip install -e ROOT_DIR
+pip install git+https://github.com/sampreet/quantrl.git
 ```

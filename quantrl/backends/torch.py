@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.torch'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-07-22"
+__updated__ = "2024-10-13"
 
 # dependencies
 import numpy as np
@@ -16,27 +16,34 @@ import torch
 from .base import BaseBackend
 
 class TorchBackend(BaseBackend):
+    """Backend to interface the PyTorch library.
+
+    Parameters
+    ----------
+    precision: str, default='double'
+        Precision of the numerical values in the backend. Options are ``'single'`` and ``'double'``.
+    device: str, default='gpu'
+        Device for the backend. Options are ``'cpu'`` and ``'gpu'``.
+    """
     def __init__(self,
         precision:str='double',
-        device:str='cuda'
+        device:str='gpu'
     ):
         # initialize BaseBackend
         super().__init__(
+            name='torch',
             library=torch,
             tensor_type=torch.Tensor,
             precision=precision
         )
 
         # set default device
-        assert 'cpu' in device or 'cuda' in device, "Invalid precision opted, options are ``'cpu'`` and ``'cuda'``."
-        if 'cuda' in device and not torch.cuda.is_available():
+        assert 'cpu' in device or 'gpu' in device, "Invalid precision opted, options are ``'cpu'`` and ``'gpu'``."
+        if 'gpu' in device and not torch.cuda.is_available():
             print("CUDA not available, defaulting to ``'cpu'``")
             device = 'cpu'
         torch.set_default_device(device)
         self.device = device
-
-        # set seeder
-        self.seeder = None
 
     def convert_to_typed(self,
         tensor,
@@ -63,14 +70,10 @@ class TorchBackend(BaseBackend):
     def generator(self,
         seed:int=None
     ) -> torch.Generator:
-        if self.seeder is None:
-            if seed is None:
-                entropy = np.random.randint(1234567890)
-            else:
-                entropy = np.random.default_rng(seed).integers(0, 1234567890, (1, ))[0]
-            self.seeder = np.random.SeedSequence(entropy)
+        if self.seed_sequence is None:
+            self.seed_sequence = self.get_seedsequence(seed)
         generator = torch.Generator(device=self.device)
-        generator.manual_seed(self.seeder.spawn(1)[0])
+        generator.manual_seed(self.seed_sequence.spawn(1)[0])
         return generator
 
     def integers(self,
@@ -112,11 +115,11 @@ class TorchBackend(BaseBackend):
         axis_0:int=None,
         axis_1:int=None
     ) -> torch.Tensor:
-        if axis_0 is not None and axis_1 is not None:
-            return torch.transpose(tensor, dim0=axis_0, dim1=axis_1)
-        return self.convert_to_typed(
-            tensor=tensor
-        ).T
+        if axis_0 is None or axis_1 is None:
+            return self.convert_to_typed(
+                tensor=tensor
+            ).T
+        return torch.transpose(tensor, dim0=axis_0, dim1=axis_1)
 
     def repeat(self,
         tensor,
@@ -165,7 +168,7 @@ class TorchBackend(BaseBackend):
         out
     ) -> torch.Tensor:
         return torch.stack(tensors, dim=axis, out=out)
-    
+
     def update(self,
         tensor,
         indices,
@@ -173,7 +176,7 @@ class TorchBackend(BaseBackend):
     ) -> torch.Tensor:
         tensor[indices] = values
         return tensor
-    
+
     def if_else(self,
         condition,
         func_true,
