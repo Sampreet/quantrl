@@ -6,23 +6,30 @@
 __name__    = 'quantrl.backends.jax'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-10-09"
+__updated__ = "2024-10-13"
 
 # dependencies
 from inspect import getfullargspec
-import numpy as np
+
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 # quantrl modules
 from .base import BaseBackend
 
 # TODO: Implement buffers
+# TODO: Implement equinox
 
 class JaxBackend(BaseBackend):
+    """Backend to interface the JAX library.
+
+    Refer to :class:`quantrl.backends.base.BaseBackend` for further documentation.
+    """
+
     def __init__(self,
         precision:str='double'
-    ):  
+    ):
         # initialize BaseBackend
         super().__init__(
             name='jax',
@@ -38,60 +45,59 @@ class JaxBackend(BaseBackend):
         # set key
         self.key = None
 
-        def numpy_transpose(
-            tensor,
+        def transpose(
+            tensor:jax.Array,
             axis_0:int=None,
             axis_1:int=None
-        ):
-            # get swapped axes
-            _shape = self.shape(
-                tensor=tensor
-            )
-            _axes = np.arange(len(_shape))
-            if axis_0 is not None and axis_1 is not None:
-                _axes[axis_1] = axis_0 % len(_shape)
-                _axes[axis_0] = axis_1 % len(_shape)
-                return np.transpose(tensor, axes=_axes)
-            else:
+        ) -> jax.Array:
+            if axis_0 is None or axis_1 is None:
                 return self.convert_to_typed(
                     tensor=tensor
                 ).T
 
+            # get swapped axes
+            _shape = jnp.shape(tensor)
+            _axes = jnp.arange(len(_shape))
+            _axes[axis_1] = axis_0 % len(_shape)
+            _axes[axis_0] = axis_1 % len(_shape)
+
+            return jnp.transpose(tensor, axes=_axes)
+
         self.jit_transpose = jax.jit(
-            fun=numpy_transpose,
-            static_argnames=('axis_0', 'axis_1')
+            fun=transpose,
+            static_argnums=(1, 2)
         )
 
         self.jit_repeat = jax.jit(
-            fun=lambda tensor, repeats, axis: jnp.repeat(tensor, repeats, axis),
-            static_argnames=('repeats', 'axis')
+            fun=jnp.repeat,
+            static_argnums=(1, 2)
         )
 
         self.jit_add = jax.jit(
             fun=lambda tensor_0, tensor_1, out: jnp.add(tensor_0, tensor_1),
-            donate_argnames='out'
+            donate_argnums=(2, )
         )
 
         self.jit_matmul = jax.jit(
             fun=lambda tensor_0, tensor_1, out: jnp.matmul(tensor_0, tensor_1),
-            donate_argnames='out'
+            donate_argnums=(2, )
         )
 
         self.jit_dot = jax.jit(
             fun=lambda tensor_0, tensor_1, out: jnp.dot(tensor_0, tensor_1),
-            donate_argnames='out'
+            donate_argnums=(2, )
         )
 
         self.jit_concatenate = jax.jit(
             fun=lambda tensors, axis, out: jnp.concatenate(tensors, axis),
-            static_argnames='axis',
-            donate_argnames='out'
+            static_argnums=(1, ),
+            donate_argnums=(2, )
         )
 
         self.jit_stack = jax.jit(
             fun=lambda tensors, axis, out: jnp.stack(tensors, axis),
-            static_argnames='axis',
-            donate_argnames='out'
+            static_argnums=(1, ),
+            donate_argnums=(2, )
         )
 
         self.jit_update = jax.jit(
@@ -138,7 +144,7 @@ class JaxBackend(BaseBackend):
         high:int=1000,
         dtype:str=None
     ) -> jax.Array:
-        return jax.random.randint(generator, shape, low, high, dtype=self.dtype_from_str(
+        return jnp.asarray(jax.random.randint(generator, shape, low, high), dtype=self.dtype_from_str(
             dtype=dtype
         ))
 
@@ -246,14 +252,14 @@ class JaxBackend(BaseBackend):
             axis=axis,
             out=out
         )
-    
+
     def update(self,
         tensor,
         indices,
         values
     ) -> jax.Array:
         return tensor.at[indices].set(values)
-    
+
     def if_else(self,
         condition,
         func_true,

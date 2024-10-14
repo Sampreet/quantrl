@@ -6,16 +6,28 @@
 __name__    = 'quantrl.solvers.context_manager'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-10-09"
-__updated__ = "2024-10-09"
+__updated__ = "2024-10-14"
 
 # quantrl modules
 from .base import BaseIVPSolver
 
-IVP_SOLVERS = dict()
+IVP_SOLVERS = {}
 
 def get_IVP_solver(
         library:str
     ) -> BaseIVPSolver:
+    """Method to obtain an IVP solver class.
+    
+    Parameters
+    ----------
+    library: str
+        Name of the library. Options are ``'jax'``, ``'numpy'`` and ``'torch'``.
+
+    Returns
+    -------
+    IVPSolver: :class:`quantrl.solvers.base.BaseIVPSolver`
+        The IVP solver class.
+    """
     if library in IVP_SOLVERS:
         return IVP_SOLVERS[library]
     if 'jax' in library.lower():

@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.deterministic'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-10-09"
+__updated__ = "2024-10-14"
 
 # quantrl modules
 from ..backends.context_manager import get_backend_instance
@@ -76,14 +76,14 @@ class LinearizedHOEnv(BaseGymEnv):
         ============    ================================================
     """
 
-    default_params = dict()
+    default_params = {}
     """dict: Default parameters of the environment."""
 
-    default_ode_solver_params = dict(
-        ode_method='vode',
-        ode_atol=1e-9,
-        ode_rtol=1e-6
-    )
+    default_ode_solver_params = {
+        'ode_method': 'vode',
+        'ode_atol': 1e-9,
+        'ode_rtol': 1e-6
+    }
     """dict: Default parameters of the ODE solver."""
 
     backend_libraries = ['torch', 'jax', 'numpy']
@@ -106,14 +106,14 @@ class LinearizedHOEnv(BaseGymEnv):
         data_idxs:list,
         backend_library:str='numpy',
         backend_precision:str='double',
-        backend_device:str='cuda',
+        backend_device:str='gpu',
         dir_prefix:str='data',
         **kwargs
     ):
         """Class constructor for LinearizedHOEnv."""
 
         # validate arguments
-        assert backend_library in self.backend_libraries, "parameter ``solver_type`` should be one of ``{}``".format(self.backend_libraries)
+        assert backend_library in self.backend_libraries, f"parameter ``solver_type`` should be one of ``{self.backend_libraries}``"
 
         # select backend
         backend = get_backend_instance(
@@ -133,11 +133,11 @@ class LinearizedHOEnv(BaseGymEnv):
         self.num_corrs = num_quads**2
 
         # set parameters
-        self.params = dict()
-        for key in self.default_params:
+        self.params = {}
+        for key, _ in self.default_params.items():
             self.params[key] = params.get(key, self.default_params[key])
         # update keyword arguments
-        for key in self.default_ode_solver_params:
+        for key, _ in self.default_ode_solver_params.items():
             kwargs[key] = kwargs.get(key, self.default_ode_solver_params[key])
         # set matrices
         self.A = backend.zeros(
@@ -502,14 +502,14 @@ class LinearizedHOVecEnv(BaseSB3Env):
         ============    ================================================
     """
 
-    default_params = dict()
+    default_params = {}
     """dict: Default parameters of the environment."""
 
-    default_ode_solver_params = dict(
-        ode_method='vode',
-        ode_atol=1e-9,
-        ode_rtol=1e-6
-    )
+    default_ode_solver_params = {
+        'ode_method': 'vode',
+        'ode_atol': 1e-9,
+        'ode_rtol': 1e-6
+    }
     """dict: Default parameters of the ODE solver."""
 
     backend_libraries = ['torch', 'jax', 'numpy']
@@ -533,35 +533,24 @@ class LinearizedHOVecEnv(BaseSB3Env):
         data_idxs:list,
         backend_library:str='numpy',
         backend_precision:str='double',
-        backend_device:str='cuda',
+        backend_device:str='gpu',
         dir_prefix:str='data',
         **kwargs
     ):
         """Class constructor for LinearizedHOEnv."""
 
         # validate arguments
-        assert backend_library in self.backend_libraries, "parameter ``solver_type`` should be one of ``{}``".format(self.backend_libraries)
+        assert backend_library in self.backend_libraries, f"parameter ``solver_type`` should be one of ``{self.backend_libraries}``"
 
         # select backend
-        if 'torch' in backend_library:
-            from ..backends.torch import TorchBackend
-            from ..solvers.torch import TorchDiffEqIVPSolver as IVPSolverClass
-            backend = TorchBackend(
-                precision=backend_precision,
-                device=backend_device
-            )
-        elif 'jax' in backend_library:
-            from ..backends.jax import JaxBackend
-            from ..solvers.jax import DiffraxIVPSolver as IVPSolverClass
-            backend = JaxBackend(
-                precision=backend_precision
-            )
-        else:
-            from ..backends.numpy import NumPyBackend
-            from ..solvers.numpy import SciPyIVPSolver as IVPSolverClass
-            backend = NumPyBackend(
-                precision=backend_precision
-            )
+        backend = get_backend_instance(
+            library=backend_library,
+            precision=backend_precision,
+            device=backend_device
+        )
+        IVPSolver = get_IVP_solver(
+            library=backend_library
+        )
 
         # set constants
         self.name = name
@@ -571,11 +560,11 @@ class LinearizedHOVecEnv(BaseSB3Env):
         self.num_corrs = num_quads**2
 
         # set parameters
-        self.params = dict()
-        for key in self.default_params:
+        self.params = {}
+        for key, _ in self.default_params.items():
             self.params[key] = params.get(key, self.default_params[key])
         # update keyword arguments
-        for key in self.default_ode_solver_params:
+        for key, _ in self.default_ode_solver_params.items():
             kwargs[key] = kwargs.get(key, self.default_ode_solver_params[key])
         # set matrices
         self.A = backend.zeros(
@@ -608,7 +597,7 @@ class LinearizedHOVecEnv(BaseSB3Env):
         )
 
         # initialize solver
-        self.solver = IVPSolverClass(
+        self.solver = IVPSolver(
             func=self.func,
             y_0=self.States[-1],
             T=self.T,

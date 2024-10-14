@@ -10,6 +10,15 @@ quantrl.solvers.base module
    :undoc-members:
    :show-inheritance:
 
+quantrl.backends.context_manager module
+---------------------------------------
+
+.. automodule:: quantrl.backends.context_manager
+   :members:
+   :private-members:
+   :undoc-members:
+   :show-inheritance:
+
 quantrl.solvers.jax module
 --------------------------
 

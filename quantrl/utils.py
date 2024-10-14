@@ -6,16 +6,17 @@
 __name__    = 'quantrl.utils'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-06-02"
-__updated__ = "2024-08-09"
+__updated__ = "2024-10-14"
 
 # dependencies
+import gc
+import os
+import time
+
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.results_plotter import ts2xy
-import gc
 import numpy as np
-import os
 import pandas
-import time
 
 class SaveOnBestMeanRewardCallback(BaseCallback):
     """Utility callback class to save the best mean reward.
@@ -61,7 +62,7 @@ class SaveOnBestMeanRewardCallback(BaseCallback):
         self.t_start = time.time()
 
         # initialize file to save mean rewards
-        with open(self.log_dir + f'reward_mean_{self.episode_start}_{self.n_episodes - 1}.txt', 'w') as file:
+        with open(self.log_dir + f'reward_mean_{self.episode_start}_{self.n_episodes - 1}.txt', 'w', encoding='utf-8') as file:
             s = f'{"time":>14} {"n_steps":>12} {"episode_curr":>12} {"reward_curr":>14} {"episode_best":>12} {"reward_best":>14}\n'
             file.write(s)
             file.close()
@@ -79,7 +80,7 @@ class SaveOnBestMeanRewardCallback(BaseCallback):
 
         if self.n_calls % self.update_steps == 0:
             # retrieve reward data from monitor file
-            with open(self.log_dir + f'learning_{self.episode_start}_{self.n_episodes - 1}.monitor.csv') as file_handler:
+            with open(self.log_dir + f'learning_{self.episode_start}_{self.n_episodes - 1}.monitor.csv', 'r', encoding='utf-8') as file_handler:
                 file_handler.readline()
                 xs, ys = ts2xy(pandas.read_csv(file_handler, index_col=None), 'timesteps')
 
@@ -100,14 +101,14 @@ class SaveOnBestMeanRewardCallback(BaseCallback):
 
                     # update console
                     if self.verbose >= 1:
-                        print(f"Saving new best model and replay buffer...")
+                        print("Saving new best model and replay buffer...")
 
                     # save model and replay buffer
                     self.model.save(self.log_dir + f'models/best_{self.n_episodes - 1}.zip')
                     self.model.save_replay_buffer(self.log_dir + f'buffers/best_{self.n_episodes - 1}.zip')
 
                 # save reward data
-                with open(self.log_dir + f'reward_mean_{self.episode_start}_{self.n_episodes - 1}.txt', 'a') as file:
+                with open(self.log_dir + f'reward_mean_{self.episode_start}_{self.n_episodes - 1}.txt', 'a', encoding='utf-8') as file:
                     file.write(f'{time.time() - self.t_start:14.03f} {self.n_calls:12d} {episode_curr:12d} {reward_curr:14.06f} {self.episode_best:12d} {self.reward_best:14.06f}\n')
                     file.close()
             gc.collect()

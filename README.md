@@ -1,6 +1,6 @@
 # QuantRL: Quantum Control using Reinforcement Learning
 
-![Latest Version](https://img.shields.io/badge/version-0.0.7-red?style=for-the-badge)
+![Latest Version](https://img.shields.io/badge/version-0.0.8-red?style=for-the-badge)
 
 > A library of modules to interface deterministic and stochastic quantum models for reinforcement learning.
 

@@ -6,7 +6,7 @@
 __name__    = 'quantrl.solvers.jax'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-03-23"
+__updated__ = "2024-10-14"
 
 # dependencies
 import jax
@@ -72,7 +72,7 @@ class DiffraxIVPSolver(BaseIVPSolver):
         y_0 = self.backend.convert_to_typed(
             tensor=y_0
         )
-    
+
         # integrate
         return dfx.diffeqsolve(
             terms=self.term,
@@ -86,9 +86,9 @@ class DiffraxIVPSolver(BaseIVPSolver):
             stepsize_controller=dfx.PIDController(
                 atol=self.solver_params['atol'],
                 rtol=self.solver_params['rtol']
-            ) 
+            )
         ).ys
-    
+
     def interpolate(self,
         T_step,
         Y

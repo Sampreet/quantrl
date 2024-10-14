@@ -1,0 +1,26 @@
+[MESSAGES CONTROL]
+disable=too-many-lines,
+        too-many-locals,
+        too-many-arguments,
+        too-many-statements,
+        too-few-public-methods,
+        too-many-public-methods,
+        too-many-instance-attributes,
+        too-many-positional-arguments,
+        line-too-long,                  # no bounded lines
+        redefined-builtin,              # catches __name__
+        duplicate-code,                 # catches __init__
+        unused-argument,                # catches Gym.Env methods
+        import-outside-toplevel,        # for numerical libraries
+        not-callable,                   # catches JAX JIT functions
+        fixme
+
+[BASIC]
+attr-naming-style=any
+variable-naming-style=any
+argument-naming-style=any
+const-naming-style=UPPER_CASE
+method-naming-style=any
+function-naming-style=any
+class-naming-style=PascalCase
+class-attribute-naming-style=snake_case

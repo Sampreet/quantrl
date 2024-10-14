@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.stochastic'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-10-09"
+__updated__ = "2024-10-14"
 
 # dependencies
 import numpy as np
@@ -68,7 +68,7 @@ class LinearEnv(BaseGymEnv):
         Keyword arguments. Refer to the ``kwargs`` parameter of :class:`quantrl.envs.base.BaseEnv` for available options.
     """
 
-    default_params = dict()
+    default_params = {}
     """dict: Default parameters of the environment."""
 
     backend_libraries = ['torch', 'jax', 'numpy']
@@ -89,14 +89,14 @@ class LinearEnv(BaseGymEnv):
         data_idxs:list,
         backend_library:str='numpy',
         backend_precision:str='double',
-        backend_device:str='cuda',
+        backend_device:str='gpu',
         dir_prefix:str='data',
         **kwargs
     ):
         """Class constructor for LinearEnv."""
 
         # validate arguments
-        assert backend_library in self.backend_libraries, "parameter ``solver_type`` should be one of ``{}``".format(self.backend_libraries)
+        assert backend_library in self.backend_libraries, f"parameter ``solver_type`` should be one of ``{self.backend_libraries}``"
 
         # select backend
         backend = get_backend_instance(
@@ -110,10 +110,11 @@ class LinearEnv(BaseGymEnv):
         self.desc = desc
 
         # set parameters
-        self.params = dict()
-        for key in self.default_params:
+        self.params = {}
+        for key, _ in self.default_params.items():
             self.params[key] = params.get(key, self.default_params[key])
         # set buffers
+        self.Ws = None
         self.I = backend.eye(
             N=n_observations,
             dtype='real'
@@ -137,7 +138,7 @@ class LinearEnv(BaseGymEnv):
             action_interval=action_interval,
             data_idxs=data_idxs,
             dir_prefix=(dir_prefix if dir_prefix != 'data' else ('data/' + self.name.lower()) + '/env') + '_' + '_'.join([
-                str(self.params[key]) for key in self.params
+                str(val) for _, val in self.params.items()
             ]),
             file_prefix='lin_env',
             **kwargs

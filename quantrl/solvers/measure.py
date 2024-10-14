@@ -24,10 +24,11 @@ References
 __name__ = 'qom.solvers.measure'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2021-01-04"
-__updated__ = "2023-05-29"
+__updated__ = "2024-10-14"
 
 # dependencies
 from typing import Union
+
 import numpy as np
 
 class QCMSolver():
@@ -51,7 +52,7 @@ class QCMSolver():
             'measure_codes'     (*list* or *str*) codenames of the measures to calculate. Options are ``'discord_G'`` for Gaussian quantum discord [3]_, ``'entan_ln'`` for quantum entanglement (using matrix multiplications, fallback) [1]_, ``'entan_ln_2'`` for quantum entanglement (using analytical expressions) [2]_, ``'sync_c'`` for complete quantum synchronization [5]_, ``'sync_p'`` for quantum phase synchronization [5]_). Default is ``['entan_ln']``.
             'indices'           (*list* or *tuple*) indices of the modes as a list or tuple of two integers. Default is ``(0, 1)``.
             ================    ====================================================
-    cb_update : callable, optional
+    cb_update : callback, optional
         Callback function to update status and progress, formatted as ``cb_update(status, progress, reset)``, where ``status`` is a string, ``progress`` is a float and ``reset`` is a boolean.
     """
 
@@ -91,7 +92,10 @@ class QCMSolver():
 
         # set parameters
         self.set_params(params)
-        
+
+        # set callback
+        self.cb_update = cb_update
+
     def set_params(self, params:dict):
         """Method to validate and set the solver parameters.
 
@@ -113,26 +117,26 @@ class QCMSolver():
         # validate measure type
         assert isinstance(measure_codes, Union[list, str].__args__), "Value of key ``'measure_codes'`` can only be of types ``list`` or ``str``"
         # convert to list
-        measure_codes = [measure_codes] if type(measure_codes) is str else measure_codes
+        measure_codes = [measure_codes] if isinstance(measure_codes, str) else measure_codes
         # check elements
         for measure_code in measure_codes:
-            assert measure_code in self.method_codes, "Elements of key ``'measure_codes'`` can only be one or more keys of ``{}``".format(self.method_codes.keys)
+            assert measure_code in self.method_codes, f"Elements of key ``'measure_codes'`` can only be one or more keys of ``{self.method_codes.keys()}``"
         # update parameter
         params['measure_codes'] = measure_codes
 
         # validate indices
         assert isinstance(indices, Union[list, tuple].__args__), "Value of key ``'indices'`` can only be of types ``list`` or ``tuple``"
         # convert to list
-        indices = list(indices) if type(indices) is tuple else indices
+        indices = list(indices) if isinstance(indices, tuple) else indices
         # check length
         assert len(indices) == 2, "Value of key ``'indices'`` can only have 2 elements"
-        assert indices[0] < _dim and indices[1] < _dim, "Elements of key ``'indices'`` cannot exceed the total number of modes ({})".format(_dim)
+        assert indices[0] < _dim and indices[1] < _dim, f"Elements of key ``'indices'`` cannot exceed the total number of modes ({_dim})"
         # update parameter
         params['indices'] = indices
 
         # set solver parameters
-        self.params = dict()
-        for key in self.solver_defaults:
+        self.params = {}
+        for key, _ in self.solver_defaults.items():
             self.params[key] = params.get(key, self.solver_defaults[key])
 
     def get_measures(self):
@@ -156,11 +160,10 @@ class QCMSolver():
         # find measures
         for j in range(_dim[1]):
             # display progress
-            if show_progress:
-                self.updater.update_progress(
-                    pos=None,
-                    dim=_dim[1],
+            if show_progress and self.cb_update is not None:
+                self.cb_update(
                     status="-" * (35 - len(measure_codes[j])) + "Obtaining Measures (" + measure_codes[j] + ")",
+                    progress=0.0,
                     reset=False
                 )
 
@@ -170,13 +173,15 @@ class QCMSolver():
             Measures[:, j]  = getattr(self, func_name)(pos_i=2 * indices[0], pos_j=2 * indices[1]) if 'corrs_P_p' not in measure_codes[j] else getattr(self, func_name)(pos_i=2 * indices[0] + 1, pos_j=2 * indices[1] + 1)
 
         # display completion
-        if show_progress:
-            self.updater.update_info(
-                status="-" * 39 + "Measures Obtained"
+        if show_progress and self.cb_update is not None:
+            self.cb_update(
+                status="-" * 39 + "Measures Obtained",
+                progress=1.0,
+                reset=False
             )
 
         return Measures
-    
+
     def get_submatrices(self, pos_i:int, pos_j:int):
         """Helper function to obtain the block matrices of the required modes and its components.
 
@@ -247,7 +252,7 @@ class QCMSolver():
 
         # symplectic invariants
         return np.linalg.det(As), np.linalg.det(Bs), np.linalg.det(Cs), np.linalg.det(Corrs_modes)
-    
+
     def get_correlation_Pearson(self, pos_i:int, pos_j:int):
         r"""Method to obtain the Pearson correlation coefficient.
 
@@ -328,7 +333,7 @@ class QCMSolver():
         # update W values
         Ws[conditions_W_1] = ((2 * np.abs(I_3s[conditions_W_1]) + np.sqrt(_discriminants[conditions_W_1])) / _divisors[conditions_W_1])**2
         # W values without main condition
-        # check sqrt and NaN condtition 
+        # check sqrt and NaN condtition
         _bs = np.multiply(I_1s, I_2s) + I_4s - I_3s**2
         _4acs = 4 * np.multiply(np.multiply(I_1s, I_2s), I_4s)
         _discriminants = _bs**2 - _4acs
@@ -339,9 +344,10 @@ class QCMSolver():
         # all validity conditions
         conditions = np.logical_and(conditions_mu, np.logical_or(conditions_W_1, conditions_W_2))
 
-        # f function 
-        func_f = lambda x: np.multiply(x + 0.5, np.log10(x + 0.5)) - np.multiply(x - 0.5, np.log10(x - 1 / 2))
-            
+        # f function
+        def func_f(x):
+            return np.multiply(x + 0.5, np.log10(x + 0.5)) - np.multiply(x - 0.5, np.log10(x - 1 / 2))
+
         # update quantum discord values
         Discord_G[conditions] = func_f(np.sqrt(I_2s[conditions])) \
                                 - func_f(mu_pluses[conditions]) \
@@ -349,7 +355,7 @@ class QCMSolver():
                                 + func_f(np.sqrt(Ws[conditions]))
 
         return Discord_G
-    
+
     def get_entanglement_logarithmic_negativity(self, pos_i:int, pos_j:int):
         """Method to obtain the logarithmic negativity entanglement values using matrices [1]_.
 
@@ -378,17 +384,17 @@ class QCMSolver():
 
         # smallest symplectic eigenvalue
         eigs, _ = np.linalg.eig(np.matmul(self.Omega_s, Corrs_modes))
-        eig_min = np.min(np.abs(eigs), axis=1)
+        eigs_min = np.min(np.abs(eigs), axis=1)
 
         # initialize entanglement
-        Entan_ln = np.zeros_like(eig_min, dtype=np.float_)
+        Entan_ln = np.zeros_like(eigs_min, dtype=np.float_)
 
         # update entanglement
-        for i in range(len(eig_min)):
-            if eig_min[i] < 0:
+        for i, eig_min in enumerate(eigs_min):
+            if eig_min < 0:
                 Entan_ln[i] = 0
             else:
-                Entan_ln[i] = np.maximum(0.0, - np.log(2 * eig_min[i]))
+                Entan_ln[i] = np.maximum(0.0, - np.log(2 * eig_min))
 
         return Entan_ln
 
@@ -430,9 +436,9 @@ class QCMSolver():
 
         # clip negative values
         Entan_ln[Entan_ln < 0.0] = 0.0
-        
+
         return Entan_ln
-        
+
     def get_synchronization_complete(self, pos_i:int, pos_j:int):
         """Method to obtain the complete quantum synchronization values [5]_.
 
@@ -482,7 +488,7 @@ class QCMSolver():
         cos_js = np.cos(arg_js)
         sin_is = np.sin(arg_is)
         sin_js = np.sin(arg_js)
-        
+
         # transformation for ith mode momentum quadrature
         p_i_prime_2s = np.multiply(sin_is**2, self.Corrs[:, pos_i, pos_i]) \
                         - np.multiply(np.multiply(sin_is, cos_is), self.Corrs[:, pos_i, pos_i + 1]) \
@@ -522,11 +528,11 @@ def get_average_amplitude_difference(Modes):
     """
 
     # validate modes
-    assert Modes is not None and (type(Modes) is list or type(Modes) is np.ndarray) and np.shape(Modes)[1] == 2, "Parameter ``Modes`` should be a list or NumPy array with dimension ``(dim, 2)``"
+    assert Modes is not None and isinstance(Modes, (list, np.ndarray)) and np.shape(Modes)[1] == 2, "Parameter ``Modes`` should be a list or NumPy array with dimension ``(dim, 2)``"
 
     # get means
     means = np.mean(Modes, axis=0)
-    
+
     # average amplitude difference
     return np.mean([np.linalg.norm(modes[0] - means[0]) - np.linalg.norm(modes[1]- means[1]) for modes in Modes])
 
@@ -545,11 +551,11 @@ def get_average_phase_difference(Modes):
     """
 
     # validate modes
-    assert Modes is not None and (type(Modes) is list or type(Modes) is np.ndarray) and np.shape(Modes)[1] == 2, "Parameter ``Modes`` should be a list or NumPy array with dimension ``(dim, 2)``"
+    assert Modes is not None and isinstance(Modes, (list, np.ndarray)) and np.shape(Modes)[1] == 2, "Parameter ``Modes`` should be a list or NumPy array with dimension ``(dim, 2)``"
 
     # get means
     means = np.mean(Modes, axis=0)
-    
+
     # average phase difference
     return np.mean([np.angle(modes[0] - means[0]) - np.angle(modes[1]- means[1]) for modes in Modes])
 
@@ -568,18 +574,18 @@ def get_bifurcation_amplitudes(Modes):
     """
 
     # validate modes
-    assert Modes is not None and (type(Modes) is list or type(Modes) is np.ndarray) and len(np.shape(Modes)) == 2, "Parameter ``Modes`` should be a list or NumPy array with dimension ``(dim, num_modes)``"
+    assert Modes is not None and isinstance(Modes, (list, np.ndarray)) and len(np.shape(Modes)) == 2, "Parameter ``Modes`` should be a list or NumPy array with dimension ``(dim, num_modes)``"
 
     # convert to real
-    Modes_real = np.concatenate((np.real(Modes), np.imag(Modes)), axis=1, dtype=np.float_)
+    Modes_real = np.concatenate((np.real(Modes), np.imag(Modes)), axis=1)
 
     # calculate gradients
     grads = np.gradient(Modes_real, axis=0)
-    
+
     # get indices where the derivative changes sign
     idxs = grads[:-1, :] * grads[1:, :] < 0
 
-    Amps = list()
+    Amps = []
     for i in range(idxs.shape[1]):
         # collect all crests and troughs
         extremas = Modes_real[:-1, i][idxs[:, i]]
@@ -609,7 +615,7 @@ def get_correlation_Pearson(Modes):
     """
 
     # validate modes
-    assert Modes is not None and (type(Modes) is list or type(Modes) is np.ndarray) and np.shape(Modes)[1] == 2, "Parameter ``Modes`` should be a list or NumPy array with dimension ``(dim, 2)``"
+    assert Modes is not None and isinstance(Modes, (list, np.ndarray)) and np.shape(Modes)[1] == 2, "Parameter ``Modes`` should be a list or NumPy array with dimension ``(dim, 2)``"
 
     # get means
     means = np.mean(Modes, axis=0)
@@ -661,10 +667,10 @@ def get_Wigner_distributions_single_mode(Corrs, params, cb_update=None):
     xs = params.get('wigner_xs', None)
     ys = params.get('wigner_ys', None)
     for val in [xs, ys]:
-        assert val is not None and (type(val) is list or type(val) is np.ndarray), "Solver parameters ``'wigner_xs'`` and ``'wigner_ys'`` should be either NumPy arrays or ``list``"
+        assert val is not None and isinstance(val, (list, np.ndarray)), "Solver parameters ``'wigner_xs'`` and ``'wigner_ys'`` should be either NumPy arrays or ``list``"
     # handle list
-    xs = np.array(xs, dtype=np.float_) if type(xs) is list else xs
-    ys = np.array(ys, dtype=np.float_) if type(xs) is list else ys
+    xs = np.array(xs, dtype=np.float_) if isinstance(xs, list) else xs
+    ys = np.array(ys, dtype=np.float_) if isinstance(xs, list) else ys
 
     # extract frequently used variables
     show_progress = params.get('show_progress', False)
@@ -696,15 +702,14 @@ def get_Wigner_distributions_single_mode(Corrs, params, cb_update=None):
         # get Wigner distributions
         for idx_y in range(len(ys)):
             for idx_x in range(len(xs)):
-                # # display progress
-                # if show_progress:
-                #     _index_status = str(j + 1) + "/" + str(dim_m) 
-                #     updater.update_progress(
-                #         pos=idx_y * len(xs) + idx_x,
-                #         dim=dim_w,
-                #         status="-" * (18 - len(_index_status)) + "Obtaining Wigners (" + _index_status + ")",
-                #         reset=False
-                #     )
+                # display progress
+                if show_progress and cb_update is not None:
+                    _index_status = str(j + 1) + "/" + str(dim_m)
+                    cb_update(
+                        status="-" * (18 - len(_index_status)) + "Obtaining Wigners (" + _index_status + ")",
+                        progress=(idx_y * len(xs) + idx_x) / dim_w,
+                        reset=False
+                    )
                 # wigner function
                 Wigners[:, j, idx_y, idx_x] = np.exp(- 0.5 * np.dot(Vects_t[idx_y, idx_x], _dots[idx_y, idx_x])[0]) / 2.0 / np.pi / np.sqrt(dets)
 
@@ -753,15 +758,14 @@ def get_Wigner_distributions_two_mode(Corrs, params, cb_update=None):
     xs = params.get('wigner_xs', None)
     ys = params.get('wigner_ys', None)
     for val in [xs, ys]:
-        assert val is not None and (type(val) is list or type(val) is np.ndarray), "Solver parameters ``'wigner_xs'`` and ``'wigner_ys'`` should be either NumPy arrays or ``list``"
+        assert val is not None and isinstance(val, (list, np.ndarray)), "Solver parameters ``'wigner_xs'`` and ``'wigner_ys'`` should be either NumPy arrays or ``list``"
     # handle list
-    xs = np.array(xs, dtype=np.float_) if type(xs) is list else xs
-    ys = np.array(ys, dtype=np.float_) if type(xs) is list else ys
+    xs = np.array(xs, dtype=np.float_) if isinstance(xs, list) else xs
+    ys = np.array(ys, dtype=np.float_) if isinstance(xs, list) else ys
 
     # extract frequently used variables
     show_progress = params.get('show_progress', False)
     indices = params.get('indices', [0])
-    dim_m = len(indices)
     dim_c = len(Corrs)
     dim_w = len(ys) * len(xs)
     pos_i = 2 * indices[0][0]
@@ -798,14 +802,13 @@ def get_Wigner_distributions_two_mode(Corrs, params, cb_update=None):
     # get Wigner distributions
     for idx_y in range(len(ys)):
         for idx_x in range(len(xs)):
-            # # display progress
-            # if show_progress:
-            #     updater.update_progress(
-            #         pos=idx_y * len(xs) + idx_x,
-            #         dim=dim_w,
-            #         status="-" * 21 + "Obtaining Wigners",
-            #         reset=False
-            #     )
+            # display progress
+            if show_progress and cb_update is not None:
+                cb_update(
+                    status="-" * 21 + "Obtaining Wigners",
+                    progress=(idx_y * len(xs) + idx_x) / dim_w,
+                    reset=False
+                )
             # wigner function
             Wigners[:, idx_y, idx_x] = np.exp(- 0.5 * np.dot(Vects_t[idx_y, idx_x], _dots[idx_y, idx_x])[0]) / 4.0 / np.pi**2 / np.sqrt(dets)
 
@@ -843,8 +846,8 @@ def validate_Modes_Corrs(Modes=None, Corrs=None, is_modes_required:bool=False, i
     assert Corrs is not None if is_corrs_required else True, "Missing required parameter ``Corrs``"
 
     # handle list
-    Modes  = np.array(Modes, dtype=np.complex_) if Modes is not None and type(Modes) is list else Modes
-    Corrs  = np.array(Corrs, dtype=np.float_) if Corrs is not None and type(Corrs) is list else Corrs
+    Modes  = np.array(Modes, dtype=np.complex_) if Modes is not None and isinstance(Modes, list) else Modes
+    Corrs  = np.array(Corrs, dtype=np.float_) if Corrs is not None and isinstance(Corrs, list) else Corrs
 
     # validate shapes
     assert len(Modes.shape) == 2 if Modes is not None else True, "``Modes`` should be of shape ``(dim, num_modes)``"
@@ -879,7 +882,7 @@ def validate_As_Coeffs(As=None, Coeffs=None):
         # validate drift matrix
         assert isinstance(As, Union[list, np.ndarray].__args__), "``As`` should be of type ``list`` or ``numpy.ndarray``"
         # convert to numpy array
-        As = np.array(As, dtype=np.float_) if type(As) is list else As
+        As = np.array(As, dtype=np.float_) if isinstance(As, list) else As
         # validate shape
         assert len(As.shape) == 3 and As.shape[1] == As.shape[2], "``As`` should be of shape ``(dim_0, 2 * num_modes, 2 * num_modes)``"
     # if coefficients are given
@@ -887,7 +890,7 @@ def validate_As_Coeffs(As=None, Coeffs=None):
         # validate coefficients
         assert isinstance(Coeffs, Union[list, np.ndarray].__args__), "``Coeffs`` should be of type ``list`` or ``numpy.ndarray``"
         # convert to numpy array
-        Coeffs = np.array(Coeffs, dtype=np.float_) if type(Coeffs) is list else Coeffs
+        Coeffs = np.array(Coeffs, dtype=np.float_) if isinstance(Coeffs, list) else Coeffs
         # validate shape
         assert len(Coeffs.shape) == 2, "``Coeffs`` should be of shape ``(dim_0, 2 * num_modes + 1)``"
 

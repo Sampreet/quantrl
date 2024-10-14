@@ -6,10 +6,11 @@
 __name__    = 'quantrl.backends.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-10-09"
+__updated__ = "2024-10-13"
 
 # dependencies
 from abc import ABC, abstractmethod
+
 import numpy as np
 
 class BaseBackend(ABC):
@@ -29,9 +30,9 @@ class BaseBackend(ABC):
 
     def __init__(
         self,
-        name,
-        library,
-        tensor_type,
+        name:str='numpy',
+        library:np=np,
+        tensor_type:np.ndarray=np.ndarray,
         precision:str='double'
     ):
         # validate parameters
@@ -68,6 +69,7 @@ class BaseBackend(ABC):
                 }
             }
         }
+        self.seed_sequence = None
 
     def is_typed(self,
         tensor,
@@ -91,10 +93,31 @@ class BaseBackend(ABC):
         _dtype = self.dtype_from_str(
             dtype=dtype
         )
-        if type(tensor) == self.tensor_type:
+        if isinstance(tensor, self.tensor_type):
             if dtype is None or (dtype is not None and tensor.dtype == _dtype):
                 return True
         return False
+
+    def get_seedsequence(self,
+        seed:int=None
+    ) -> np.random.SeedSequence:
+        """Method to obtain a SeedSequence object.
+        
+        Parameters
+        ----------
+        seed: int
+            Initial seed to obtain the entropy.
+        
+        Returns
+        -------
+        seed_sequence: :class:`numpy.random.SeedSequence`
+            The SeedSequence object.
+        """
+        if seed is None:
+            entropy = np.random.randint(1234567890)
+        else:
+            entropy = np.random.default_rng(seed).integers(0, 1234567890, (1, ))[0]
+        return np.random.SeedSequence(entropy)
 
     @abstractmethod
     def convert_to_typed(self,
@@ -546,37 +569,41 @@ class BaseBackend(ABC):
         dtype: type
             Selected data-type.
         """
-
-        # validate params
-        assert dtype is None or dtype in ['integer', 'real', 'complex'], "parameter ``dtype`` can be either ``'integer'``, ``'real'`` or ``'complex'``."
-
         # default dtype is the real data-type
-        if dtype is None:
+        if dtype is None or dtype not in ['integer', 'real', 'complex']:
             dtype = 'real'
         return self.dtypes['numpy' if numpy else 'typed'][self.precision][dtype]
-    
+
     def jit_transpose(self, tensor, axis_0, axis_1):
+        """Method to JIT-compile transposition."""
         return self.transpose(tensor, axis_0, axis_1)
-    
+
     def jit_repeat(self, tensor, repeats, axis):
+        """Method to JIT-compile repitition."""
         return self.repeat(tensor, repeats, axis)
-    
+
     def jit_add(self, tensor_0, tensor_1, out):
+        """Method to JIT-compile addition."""
         return self.add(tensor_0, tensor_1, out=out)
-    
+
     def jit_matmul(self, tensor_0, tensor_1, out):
+        """Method to JIT-compile matrix multiplication."""
         return self.matmul(tensor_0, tensor_1, out)
-    
+
     def jit_dot(self, tensor_0, tensor_1, out):
+        """Method to JIT-compile dot product."""
         return self.dot(tensor_0, tensor_1, out)
-    
+
     def jit_concatenate(self, tensors, axis, out):
+        """Method to JIT-compile concatenation."""
         return self.concatenate(tensors, axis, out)
-    
+
     def jit_stack(self, tensors, axis, out):
+        """Method to JIT-compile stacking."""
         return self.stack(tensors, axis, out)
-    
+
     def jit_update(self, tensor, indices, values):
+        """Method to JIT-compile updation."""
         return self.update(tensor, indices, values)
 
     def empty(self,

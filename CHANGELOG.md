@@ -1,6 +1,17 @@
 # Changelog
 
-## 2027/08/09 - 00 - v0.0.7 - Update Callback
+## 2024/10/14 - 00 - v0.0.8 - Instantiation and GitHub CI
+* Instantiated backends and solvers with different numerical libraries:
+    * Added `context_manager` modules to `quantrl.backends` and `quantrl.solvers` packages.
+    * Added support for JIT-compilation in `quantrl.backends` package.
+    * Changed naming convention for GPU-based options as `gpu` from `cuda`.
+* Added `tox`-based testing and continuous integration with GitHub workflows.
+* Updated all modules with PEP-based code styling and added `pylintrc`.
+* Updated `requirements.txt` and added version to `quantrl.__init__`.
+* Replaced `setup.py` with `pyproject.toml`.
+* Updated `docs` and `README`.
+
+## 2024/08/09 - 00 - v0.0.7 - Update Callback
 * Fixed issue with cache indexing in `quantrl.envs.base` module.
 * Updated best reward callback in `quantrl.utils` module.
 * Added `seaborn` to `requirements` and `setup`.
