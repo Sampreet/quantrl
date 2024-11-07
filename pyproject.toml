@@ -26,6 +26,7 @@ dependencies = [
     "scipy",
     "matplotlib",
     "tqdm",
+    "rich",
     "pillow",
     "pandas",
     "gymnasium",
@@ -76,7 +77,15 @@ requires =
     tox>=4
     virtualenv>=20
 env_list =
+    test
     lint
+
+[testenv:test]
+description = run pytest under {base_python}
+deps =
+    -r requirements_tox.txt
+commands =
+    pytest
 
 [testenv:lint]
 description = run pylint under {base_python}

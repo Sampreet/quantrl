@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.torch'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-10-13"
+__updated__ = "2024-11-07"
 
 # dependencies
 import numpy as np
@@ -62,7 +62,15 @@ class TorchBackend(BaseBackend):
         tensor,
         dtype:str=None
     ) -> np.ndarray:
-        return np.asarray(tensor.detach().cpu().numpy() if self.device == 'cuda' else tensor.numpy(), dtype=self.dtype_from_str(
+        if self.is_typed(
+            tensor=tensor,
+            dtype=dtype
+        ):
+            return np.asarray(tensor.detach().cpu().numpy() if self.device == 'cuda' else tensor.numpy(), dtype=self.dtype_from_str(
+                dtype=dtype,
+                numpy=True
+            ) if dtype is not None else None)
+        return np.array(tensor, dtype=self.dtype_from_str(
             dtype=dtype,
             numpy=True
         ) if dtype is not None else None)
@@ -73,7 +81,7 @@ class TorchBackend(BaseBackend):
         if self.seed_sequence is None:
             self.seed_sequence = self.get_seedsequence(seed)
         generator = torch.Generator(device=self.device)
-        generator.manual_seed(self.seed_sequence.spawn(1)[0])
+        generator.manual_seed(int(self.seed_sequence.spawn(1)[0].generate_state(1)[0]))
         return generator
 
     def integers(self,

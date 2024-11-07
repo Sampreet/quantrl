@@ -2,6 +2,7 @@ numpy<2.0.0
 scipy
 matplotlib
 tqdm
+rich
 pillow
 pandas
 gymnasium
