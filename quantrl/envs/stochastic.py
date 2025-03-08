@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.stochastic'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-10-14"
+__updated__ = "2025-03-08"
 
 # dependencies
 import numpy as np
@@ -89,7 +89,7 @@ class LinearEnv(BaseGymEnv):
         data_idxs:list,
         backend_library:str='numpy',
         backend_precision:str='double',
-        backend_device:str='gpu',
+        backend_device:str='cuda',
         dir_prefix:str='data',
         **kwargs
     ):

@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.jax'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-10-13"
+__updated__ = "2024-11-07"
 
 # dependencies
 from inspect import getfullargspec
@@ -69,7 +69,7 @@ class JaxBackend(BaseBackend):
         )
 
         self.jit_repeat = jax.jit(
-            fun=jnp.repeat,
+            fun=lambda tensor, repeats, axis: jnp.repeat(tensor, repeats, axis),
             static_argnums=(1, 2)
         )
 
@@ -122,7 +122,7 @@ class JaxBackend(BaseBackend):
         tensor,
         dtype:str=None
     ) -> np.ndarray:
-        return np.array(tensor, dtype=self.dtype_from_str(
+        return np.asarray(tensor, dtype=self.dtype_from_str(
             dtype=dtype,
             numpy=True
         ) if dtype is not None else None)

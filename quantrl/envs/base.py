@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-10-14"
+__updated__ = "2024-11-07"
 
 # dependencies
 from abc import ABC, abstractmethod
@@ -941,8 +941,9 @@ class BaseGymEnv(BaseEnv, Env):
         self.io.update_cache(
             data=self.all_data if self.cache_all_data else self.data
         )
-
-        # update plot
+        # update episode reward
+        self.data_rewards.append(self.rewards)
+        # update plotter
         if self.plot and self.traj_idx % self.plot_interval == 0:
             self.plotter.plot_lines(
                 xs=self.T_norm,
@@ -953,6 +954,7 @@ class BaseGymEnv(BaseEnv, Env):
 
         # close environment
         if close:
+            self.reset()
             self.close(
                 save=False
             )
@@ -1422,7 +1424,9 @@ class BaseSB3Env(BaseEnv, VecEnv):
                 print("Batch truncated")
                 break
 
-        # update plot
+        # update episode reward
+        self.data_rewards.append(self.rewards)
+        # update plotter
         if self.plot:
             for _i in tqdm(
                 range(len(self.plotter_env_idxs)),
@@ -1439,11 +1443,9 @@ class BaseSB3Env(BaseEnv, VecEnv):
                 )
             self.plotter.hold_plot()
 
-        # update episode reward
-        self.data_rewards.append(self.rewards)
-
         # close environment
         if close:
+            self.reset()
             self.close(
                 save=save
             )

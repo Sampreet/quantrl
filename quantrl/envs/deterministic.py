@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.deterministic'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-10-14"
+__updated__ = "2025-03-08"
 
 # quantrl modules
 from ..backends.context_manager import get_backend_instance
@@ -70,7 +70,7 @@ class LinearizedHOEnv(BaseGymEnv):
         ============    ================================================
         key             value
         ============    ================================================
-        ode_method      (*str*) method used to solve the ODEs/DDEs. Available options are ``'dopri8'``, ``'dopri5'``, ``'bosh3'``, ``'fehlberg2'`` and ``'adaptive_huen'`` for a TorchDiffEq-based solver, ``'dopri8'``, ``'dopri5'`` and ``'tsit5'`` for a Diffrax-based solver and ``'BDF'``, ``'DOP853'``, ``'LSODA'``, ``'Radau'``, ``'RK23'``, ``'RK45'``, ``'dop853'``, ``'dopri5'``, ``'lsoda'``, ``'zvode'`` and ``'vode'`` for a SciPy-based solver. Default is ``'vode'``.
+        ode_method      (*str*) method used to solve the ODEs/DDEs. Available options are ``'tist5'``, ``'dopri8'``, ``'dopri5'``, ``'bosh3'``, ``'fehlberg2'`` and ``'adaptive_huen'`` for a TorchDiffEq-based solver, ``'dopri8'``, ``'dopri5'`` and ``'tsit5'`` for a Diffrax-based solver and ``'BDF'``, ``'DOP853'``, ``'LSODA'``, ``'Radau'``, ``'RK23'``, ``'RK45'``, ``'dop853'``, ``'dopri5'``, ``'lsoda'``, ``'zvode'`` and ``'vode'`` for a SciPy-based solver. Default is ``'dopri5'``.
         ode_atol        (*float*) absolute tolerance of the ODE/DDE solver. Default is ``1e-9``.
         ode_rtol        (*float*) relative tolerance of the ODE/DDE solver. Default is ``1e-6``.
         ============    ================================================
@@ -80,7 +80,7 @@ class LinearizedHOEnv(BaseGymEnv):
     """dict: Default parameters of the environment."""
 
     default_ode_solver_params = {
-        'ode_method': 'vode',
+        'ode_method': 'dopri5',
         'ode_atol': 1e-9,
         'ode_rtol': 1e-6
     }
@@ -106,7 +106,7 @@ class LinearizedHOEnv(BaseGymEnv):
         data_idxs:list,
         backend_library:str='numpy',
         backend_precision:str='double',
-        backend_device:str='gpu',
+        backend_device:str='cuda',
         dir_prefix:str='data',
         **kwargs
     ):
@@ -533,7 +533,7 @@ class LinearizedHOVecEnv(BaseSB3Env):
         data_idxs:list,
         backend_library:str='numpy',
         backend_precision:str='double',
-        backend_device:str='gpu',
+        backend_device:str='cuda',
         dir_prefix:str='data',
         **kwargs
     ):

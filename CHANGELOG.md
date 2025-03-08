@@ -1,5 +1,15 @@
 # Changelog
 
+## 2025/03/08 - 00 - v0.1.0.dev - Bump NumPy
+* Modified sources to support NumPy 2.x.x.
+* Minor fixes to `quantrl.backends` and `quantrl.envs` packages.
+* Set default ODE solver method to ``'dopri5'`` in `quantrl.envs.deterministic` module.
+* Added option for ``'tsit5'`` in `quantrl.solvers.torch` module.
+* Templated tests for `quantrl.envs.stochastic` module.
+* Updated `requirements`,, `requirements_tox` and `pyproject`.
+* Updated GitHub workflows for `tox` and `pylintrc`.
+* Updated version in `docs` and `README`.
+
 ## 2024/10/14 - 00 - v0.0.8 - Instantiation and GitHub CI
 * Instantiated backends and solvers with different numerical libraries:
     * Added `context_manager` modules to `quantrl.backends` and `quantrl.solvers` packages.

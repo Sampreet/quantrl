@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.torch'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-10-13"
+__updated__ = "2025-03-08"
 
 # dependencies
 import numpy as np
@@ -22,12 +22,12 @@ class TorchBackend(BaseBackend):
     ----------
     precision: str, default='double'
         Precision of the numerical values in the backend. Options are ``'single'`` and ``'double'``.
-    device: str, default='gpu'
-        Device for the backend. Options are ``'cpu'`` and ``'gpu'``.
+    device: str, default='cuda'
+        Device for the backend. Options are ``'cpu'`` and ``'cuda'``.
     """
     def __init__(self,
         precision:str='double',
-        device:str='gpu'
+        device:str='cuda'
     ):
         # initialize BaseBackend
         super().__init__(
@@ -38,8 +38,8 @@ class TorchBackend(BaseBackend):
         )
 
         # set default device
-        assert 'cpu' in device or 'gpu' in device, "Invalid precision opted, options are ``'cpu'`` and ``'gpu'``."
-        if 'gpu' in device and not torch.cuda.is_available():
+        assert 'cpu' in device or 'cuda' in device, "Invalid precision opted, options are ``'cpu'`` and ``'cuda'``."
+        if 'cuda' in device and not torch.cuda.is_available():
             print("CUDA not available, defaulting to ``'cpu'``")
             device = 'cpu'
         torch.set_default_device(device)
@@ -62,7 +62,15 @@ class TorchBackend(BaseBackend):
         tensor,
         dtype:str=None
     ) -> np.ndarray:
-        return np.asarray(tensor.detach().cpu().numpy() if self.device == 'cuda' else tensor.numpy(), dtype=self.dtype_from_str(
+        if self.is_typed(
+            tensor=tensor,
+            dtype=dtype
+        ):
+            return np.asarray(tensor.detach().cpu().numpy() if self.device == 'cuda' else tensor.numpy(), dtype=self.dtype_from_str(
+                dtype=dtype,
+                numpy=True
+            ) if dtype is not None else None)
+        return np.array(tensor, dtype=self.dtype_from_str(
             dtype=dtype,
             numpy=True
         ) if dtype is not None else None)
@@ -73,7 +81,7 @@ class TorchBackend(BaseBackend):
         if self.seed_sequence is None:
             self.seed_sequence = self.get_seedsequence(seed)
         generator = torch.Generator(device=self.device)
-        generator.manual_seed(self.seed_sequence.spawn(1)[0])
+        generator.manual_seed(int(self.seed_sequence.spawn(1)[0].generate_state(1)[0]))
         return generator
 
     def integers(self,

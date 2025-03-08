@@ -13,7 +13,8 @@ disable=too-many-lines,
         unused-argument,                # catches Gym.Env methods
         import-outside-toplevel,        # for numerical libraries
         not-callable,                   # catches JAX JIT functions
-        fixme
+        unnecessary-lambda,             # catches JAX JIT functions
+        fixme                           # catches TODO
 
 [BASIC]
 attr-naming-style=any

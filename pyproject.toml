@@ -22,10 +22,11 @@ readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.10"
 dependencies = [
-    "numpy<2.0.0",
+    "numpy",
     "scipy",
     "matplotlib",
     "tqdm",
+    "rich",
     "pillow",
     "pandas",
     "gymnasium",
@@ -50,9 +51,6 @@ jax-gpu = [
     "diffrax",
 ]
 torch = [
-    "torch",
-    "torchvision",
-    "torchaudio",
     "torchdiffeq",
 ]
 
@@ -76,7 +74,15 @@ requires =
     tox>=4
     virtualenv>=20
 env_list =
+    test
     lint
+
+[testenv:test]
+description = run pytest under {base_python}
+deps =
+    -r requirements_tox.txt
+commands =
+    pytest tests
 
 [testenv:lint]
 description = run pylint under {base_python}
