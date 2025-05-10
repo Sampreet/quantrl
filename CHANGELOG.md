@@ -1,5 +1,11 @@
 # Changelog
 
+## 2025/05/10 - 00 - v0.0.9 - Update Requirements
+* Added support for NumPy version `2.0+` with minimum Python version `3.12`.
+* Minor fixes to `quantrl.backends.jax` and `quantrl.io` modules.
+* Minor changes to `CONTRIBUTING.md` and `pylintrc`.
+* Updated `README`, `pyproject.toml` and `requirements`.
+
 ## 2024/10/14 - 00 - v0.0.8 - Instantiation and GitHub CI
 * Instantiated backends and solvers with different numerical libraries:
     * Added `context_manager` modules to `quantrl.backends` and `quantrl.solvers` packages.

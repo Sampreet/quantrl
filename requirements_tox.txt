@@ -1,10 +1,8 @@
-pytest
-pytest-cov
-pylint
-numpy<2.0.0
+numpy
 scipy
 matplotlib
 tqdm
+rich
 pillow
 pandas
 gymnasium
@@ -12,3 +10,6 @@ stable-baselines3
 torchdiffeq
 jax
 diffrax
+pytest
+pytest-cov
+pylint

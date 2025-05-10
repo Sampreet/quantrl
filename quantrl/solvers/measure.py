@@ -24,12 +24,15 @@ References
 __name__ = 'qom.solvers.measure'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2021-01-04"
-__updated__ = "2024-10-14"
+__updated__ = "2025-04-21"
 
 # dependencies
 from typing import Union
 
 import numpy as np
+
+# TODO: implement backends and dtypes
+# currently set to 64-bit floats
 
 class QCMSolver():
     r"""Class to solve for quantum correlation measures.
@@ -87,8 +90,12 @@ class QCMSolver():
             Corrs=Corrs
         )
 
+        # set datatypes
+        self.numpy_complex = self.Modes.dtype if self.Modes is not None else np.complex128
+        self.numpy_real = self.Corrs.dtype if self.Corrs is not None else np.float64
+
         # set symplectic matrix
-        self.Omega_s = np.kron(np.eye(2, dtype=np.float_), np.array([[0, 1], [-1, 0]], dtype=np.float_))
+        self.Omega_s = np.kron(np.eye(2, dtype=self.numpy_real), np.array([[0, 1], [-1, 0]], dtype=self.numpy_real))
 
         # set parameters
         self.set_params(params)
@@ -155,7 +162,7 @@ class QCMSolver():
         _dim = (len(self.Corrs), len(self.params['measure_codes']))
 
         # initialize measures
-        Measures = np.zeros(_dim, dtype=np.float_)
+        Measures = np.zeros(_dim, dtype=self.numpy_real)
 
         # find measures
         for j in range(_dim[1]):
@@ -218,7 +225,7 @@ class QCMSolver():
         Corrs_modes = np.concatenate((np.concatenate((As, Cs), axis=2), np.concatenate((C_Ts, Bs), axis=2)), axis=1)
 
         # # correlation matrix of the two modes (slow)
-        # Corrs_modes = np.array([np.block([[As[i], Cs[i]], [C_Ts[i], Bs[i]]]) for i in range(len(self.Corrs))], dtype=np.float_)
+        # Corrs_modes = np.array([np.block([[As[i], Cs[i]], [C_Ts[i], Bs[i]]]) for i in range(len(self.Corrs))], dtype=self.numpy_real)
 
         return Corrs_modes, As, Bs, Cs
 
@@ -283,7 +290,7 @@ class QCMSolver():
         mean_jj = np.mean(self.Corrs[:, pos_j, pos_j])
 
         # Pearson correlation coefficient as a repeated array
-        return np.array([mean_ij / np.sqrt(mean_ii * mean_jj)] * len(self.Corrs), dtype=np.float_)
+        return np.array([mean_ij / np.sqrt(mean_ii * mean_jj)] * len(self.Corrs), dtype=self.numpy_real)
 
     def get_discord_Gaussian(self, pos_i:int, pos_j:int):
         """Method to obtain Gaussian quantum discord values [3]_.
@@ -302,10 +309,10 @@ class QCMSolver():
         """
 
         # initialize values
-        mu_pluses = np.zeros(len(self.Corrs), dtype=np.float_)
-        mu_minuses = np.zeros(len(self.Corrs), dtype=np.float_)
-        Ws = np.zeros(len(self.Corrs), dtype=np.float_)
-        Discord_G = np.zeros(len(self.Corrs), dtype=np.float_)
+        mu_pluses = np.zeros(len(self.Corrs), dtype=self.numpy_real)
+        mu_minuses = np.zeros(len(self.Corrs), dtype=self.numpy_real)
+        Ws = np.zeros(len(self.Corrs), dtype=self.numpy_real)
+        Discord_G = np.zeros(len(self.Corrs), dtype=self.numpy_real)
 
         # get symplectic invariants
         I_1s, I_2s, I_3s, I_4s = self.get_invariants(
@@ -387,7 +394,7 @@ class QCMSolver():
         eigs_min = np.min(np.abs(eigs), axis=1)
 
         # initialize entanglement
-        Entan_ln = np.zeros_like(eigs_min, dtype=np.float_)
+        Entan_ln = np.zeros_like(eigs_min, dtype=self.numpy_real)
 
         # update entanglement
         for i, eig_min in enumerate(eigs_min):
@@ -415,7 +422,7 @@ class QCMSolver():
         """
 
         # initialize values
-        Entan_ln = np.zeros(len(self.Corrs), dtype=np.float_)
+        Entan_ln = np.zeros(len(self.Corrs), dtype=self.numpy_real)
 
         # symplectic invariants
         I_1s, I_2s, I_3s, I_4s = self.get_invariants(
@@ -669,8 +676,8 @@ def get_Wigner_distributions_single_mode(Corrs, params, cb_update=None):
     for val in [xs, ys]:
         assert val is not None and isinstance(val, (list, np.ndarray)), "Solver parameters ``'wigner_xs'`` and ``'wigner_ys'`` should be either NumPy arrays or ``list``"
     # handle list
-    xs = np.array(xs, dtype=np.float_) if isinstance(xs, list) else xs
-    ys = np.array(ys, dtype=np.float_) if isinstance(xs, list) else ys
+    xs = np.array(xs, dtype=Corrs.dtype) if isinstance(xs, list) else xs
+    ys = np.array(ys, dtype=Corrs.dtype) if isinstance(xs, list) else ys
 
     # extract frequently used variables
     show_progress = params.get('show_progress', False)
@@ -684,7 +691,7 @@ def get_Wigner_distributions_single_mode(Corrs, params, cb_update=None):
     Vects_t = np.transpose(Vects, axes=(0, 1, 3, 2))
 
     # initialize measures
-    Wigners = np.zeros((dim_c, dim_m, ys.shape[0], xs.shape[0]), dtype=np.float_)
+    Wigners = np.zeros((dim_c, dim_m, ys.shape[0], xs.shape[0]), dtype=Corrs.dtype)
 
     # iterate over indices
     for j in range(dim_m):
@@ -760,8 +767,8 @@ def get_Wigner_distributions_two_mode(Corrs, params, cb_update=None):
     for val in [xs, ys]:
         assert val is not None and isinstance(val, (list, np.ndarray)), "Solver parameters ``'wigner_xs'`` and ``'wigner_ys'`` should be either NumPy arrays or ``list``"
     # handle list
-    xs = np.array(xs, dtype=np.float_) if isinstance(xs, list) else xs
-    ys = np.array(ys, dtype=np.float_) if isinstance(xs, list) else ys
+    xs = np.array(xs, dtype=Corrs.dtype) if isinstance(xs, list) else xs
+    ys = np.array(ys, dtype=Corrs.dtype) if isinstance(xs, list) else ys
 
     # extract frequently used variables
     show_progress = params.get('show_progress', False)
@@ -773,13 +780,13 @@ def get_Wigner_distributions_two_mode(Corrs, params, cb_update=None):
     # get column vectors and row vectors
     _X, _Y = np.meshgrid(xs, ys)
     _dim = (ys.shape[0], xs.shape[0], 1, 1)
-    Vects_a = np.concatenate((np.reshape(_X, _dim), np.zeros(_dim, dtype=np.float_)), axis=2) if indices[0][1] == 0 else np.concatenate((np.zeros(_dim, dtype=np.float_), np.reshape(_X, _dim)), axis=2)
-    Vects_b = np.concatenate((np.reshape(_Y, _dim), np.zeros(_dim, dtype=np.float_)), axis=2) if indices[1][1] == 0 else np.concatenate((np.zeros(_dim, dtype=np.float_), np.reshape(_Y, _dim)), axis=2)
+    Vects_a = np.concatenate((np.reshape(_X, _dim), np.zeros(_dim, dtype=Corrs.dtype)), axis=2) if indices[0][1] == 0 else np.concatenate((np.zeros(_dim, dtype=Corrs.dtype), np.reshape(_X, _dim)), axis=2)
+    Vects_b = np.concatenate((np.reshape(_Y, _dim), np.zeros(_dim, dtype=Corrs.dtype)), axis=2) if indices[1][1] == 0 else np.concatenate((np.zeros(_dim, dtype=Corrs.dtype), np.reshape(_Y, _dim)), axis=2)
     Vects = np.concatenate((Vects_a, Vects_b), axis=2)
     Vects_t = np.transpose(Vects, axes=(0, 1, 3, 2))
 
     # initialize measures
-    Wigners = np.zeros((dim_c, ys.shape[0], xs.shape[0]), dtype=np.float_)
+    Wigners = np.zeros((dim_c, ys.shape[0], xs.shape[0]), dtype=Corrs.dtype)
 
     # correlation matrix of the ith mode
     As = Corrs[:, pos_i:pos_i + 2, pos_i:pos_i + 2]
@@ -846,8 +853,8 @@ def validate_Modes_Corrs(Modes=None, Corrs=None, is_modes_required:bool=False, i
     assert Corrs is not None if is_corrs_required else True, "Missing required parameter ``Corrs``"
 
     # handle list
-    Modes  = np.array(Modes, dtype=np.complex_) if Modes is not None and isinstance(Modes, list) else Modes
-    Corrs  = np.array(Corrs, dtype=np.float_) if Corrs is not None and isinstance(Corrs, list) else Corrs
+    Modes  = np.array(Modes, dtype=np.complex128) if Modes is not None and isinstance(Modes, list) else Modes
+    Corrs  = np.array(Corrs, dtype=np.float64) if Corrs is not None and isinstance(Corrs, list) else Corrs
 
     # validate shapes
     assert len(Modes.shape) == 2 if Modes is not None else True, "``Modes`` should be of shape ``(dim, num_modes)``"
@@ -882,7 +889,7 @@ def validate_As_Coeffs(As=None, Coeffs=None):
         # validate drift matrix
         assert isinstance(As, Union[list, np.ndarray].__args__), "``As`` should be of type ``list`` or ``numpy.ndarray``"
         # convert to numpy array
-        As = np.array(As, dtype=np.float_) if isinstance(As, list) else As
+        As = np.array(As, dtype=np.float64) if isinstance(As, list) else As
         # validate shape
         assert len(As.shape) == 3 and As.shape[1] == As.shape[2], "``As`` should be of shape ``(dim_0, 2 * num_modes, 2 * num_modes)``"
     # if coefficients are given
@@ -890,7 +897,7 @@ def validate_As_Coeffs(As=None, Coeffs=None):
         # validate coefficients
         assert isinstance(Coeffs, Union[list, np.ndarray].__args__), "``Coeffs`` should be of type ``list`` or ``numpy.ndarray``"
         # convert to numpy array
-        Coeffs = np.array(Coeffs, dtype=np.float_) if isinstance(Coeffs, list) else Coeffs
+        Coeffs = np.array(Coeffs, dtype=np.float64) if isinstance(Coeffs, list) else Coeffs
         # validate shape
         assert len(Coeffs.shape) == 2, "``Coeffs`` should be of shape ``(dim_0, 2 * num_modes + 1)``"
 

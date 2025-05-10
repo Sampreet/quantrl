@@ -1,6 +1,6 @@
 # QuantRL: Quantum Control using Reinforcement Learning
 
-![Latest Version](https://img.shields.io/badge/version-0.0.8-red?style=for-the-badge)
+![Latest Version](https://img.shields.io/badge/version-0.0.9-red?style=for-the-badge)
 
 > A library of modules to interface deterministic and stochastic quantum models for reinforcement learning.
 
@@ -11,26 +11,23 @@
 * Support for deterministic and stochastic linear environments.
 * Live visualization and learning curves.
 
-### What's New in v0.0.7
-
-* Added support for measurement noise in observations.
-* Updated stochastic environment for fast Wiener processes.
-* Asynchronous cache-dump to speed up environment evolution.
-* Callback to save best mean reward.
-
-### What's New in v0.0.6
+### What's New in v0.0.x
 
 * Initialize environments with any of the three backends: NumPy, PyTorch and JAX.
 * Solve IVPs for the popular libraries `TorchDiffEq` and `Diffrax`.
+* Asynchronous cache-dump to speed up environment evolution.
+* Updated stochastic environment for fast Wiener processes.
+* Added support for measurement noise in observations.
+* Callback to save best mean reward.
 
 ## Installation
 
-[QuantRL](https://github.com/sampreet/quantrl) requires `Python 3.10+`, preferably installed via the [Anaconda distribution](https://www.anaconda.com/download).
+[QuantRL](https://github.com/sampreet/quantrl) requires `Python 3.12+`, preferably installed via the [Anaconda distribution](https://www.anaconda.com/download).
 The toolbox primarily relies on `gymnasium` (for single environments) and `stable-baselines3` (for vectorized environments).
 All of its dependencies can be installed using:
 
 ```bash
-conda install "numpy<2.0.0" scipy matplotlib tqdm pillow pandas gymnasium stable-baselines3
+python -m pip install numpy scipy matplotlib tqdm pillow pandas gymnasium stable-baselines3
 ```
 
 Additionally, to avail the PyTorch or JAX backends, the latest version of these framework (for both CPU and GPU) should be installed (preferably in different `conda` environments) using in their official documentations: [PyTorch docs](https://pytorch.org/get-started/locally/) and [JAX docs](https://jax.readthedocs.io/en/latest/installation.html).

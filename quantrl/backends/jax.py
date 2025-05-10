@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.jax'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-10-13"
+__updated__ = "2025-04-21"
 
 # dependencies
 from inspect import getfullargspec
@@ -64,44 +64,44 @@ class JaxBackend(BaseBackend):
             return jnp.transpose(tensor, axes=_axes)
 
         self.jit_transpose = jax.jit(
-            fun=transpose,
+            transpose,
             static_argnums=(1, 2)
         )
 
         self.jit_repeat = jax.jit(
-            fun=jnp.repeat,
+            jnp.repeat,
             static_argnums=(1, 2)
         )
 
         self.jit_add = jax.jit(
-            fun=lambda tensor_0, tensor_1, out: jnp.add(tensor_0, tensor_1),
+            lambda tensor_0, tensor_1, out: jnp.add(tensor_0, tensor_1),
             donate_argnums=(2, )
         )
 
         self.jit_matmul = jax.jit(
-            fun=lambda tensor_0, tensor_1, out: jnp.matmul(tensor_0, tensor_1),
+            lambda tensor_0, tensor_1, out: jnp.matmul(tensor_0, tensor_1),
             donate_argnums=(2, )
         )
 
         self.jit_dot = jax.jit(
-            fun=lambda tensor_0, tensor_1, out: jnp.dot(tensor_0, tensor_1),
+            lambda tensor_0, tensor_1, out: jnp.dot(tensor_0, tensor_1),
             donate_argnums=(2, )
         )
 
         self.jit_concatenate = jax.jit(
-            fun=lambda tensors, axis, out: jnp.concatenate(tensors, axis),
+            lambda tensors, axis, out: jnp.concatenate(tensors, axis),
             static_argnums=(1, ),
             donate_argnums=(2, )
         )
 
         self.jit_stack = jax.jit(
-            fun=lambda tensors, axis, out: jnp.stack(tensors, axis),
+            lambda tensors, axis, out: jnp.stack(tensors, axis),
             static_argnums=(1, ),
             donate_argnums=(2, )
         )
 
         self.jit_update = jax.jit(
-            fun=lambda tensor, indices, values: tensor.at[indices].set(values),
+            lambda tensor, indices, values: tensor.at[indices].set(values),
             donate_argnums=(0, )
         )
 

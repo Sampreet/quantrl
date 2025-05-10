@@ -11,10 +11,9 @@ disable=too-many-lines,
         redefined-builtin,              # catches __name__
         duplicate-code,                 # catches __init__
         unused-argument,                # catches Gym.Env methods
-        import-outside-toplevel,        # for numerical libraries
+        import-outside-toplevel,        # for context managers
         not-callable,                   # catches JAX JIT functions
-        fixme
-
+        fixme,
 [BASIC]
 attr-naming-style=any
 variable-naming-style=any

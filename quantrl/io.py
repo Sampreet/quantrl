@@ -6,7 +6,7 @@
 __name__    = 'quantrl.io'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-12-07"
-__updated__ = "2024-10-14"
+__updated__ = "2025-04-21"
 
 # dependencies
 import gc
@@ -96,7 +96,7 @@ class FileIO():
 
         # update list
         if self.cache is None:
-            self.cache = np.zeros((self.cache_dump_interval, *data.shape), dtype=np.float_)
+            self.cache = np.zeros((self.cache_dump_interval, *data.shape), dtype=data.dtype)
 
         self.index += 1
         self.cache[self.index % self.cache_dump_interval] = data

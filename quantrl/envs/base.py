@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-10-14"
+__updated__ = "2025-05-10"
 
 # dependencies
 from abc import ABC, abstractmethod
@@ -548,7 +548,7 @@ class BaseEnv(ABC):
         # initialize plotter
         plotter = LearningCurvePlotter(
             axis_args=axis_args if axis_args is not None and len(axis_args) == 4 else self.default_axis_args_learning_curve,
-            average_over=self.average_over
+            average_over=self.average_over if self.average_over < data_rewards.shape[0] else int(data_rewards.shape[0] / 2)
         )
         # update plot
         plotter.add_data(

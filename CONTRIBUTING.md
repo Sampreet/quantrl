@@ -57,11 +57,11 @@ ROOT_DIR/
 ├───CODE_OF_CONDUCT.md
 ├───CONTRIBUTING.md
 ├───LICENSE
-├───MANIFEST.in
+├───pylintrc
 ├───pyproject.toml
 ├───README.md
 ├───requirements.txt
-└───setup.py
+└───requirements_tox.txt
 ```
 
 ### Installing in Editable Mode
