@@ -1,5 +1,24 @@
 # Changelog
 
+## 2025/05/12 - 00 - v0.0.10 - PyTorch GPU Support
+* Removed CI builds for MacOS and Windows.
+* Changes to `quantrl.backends` package:
+    * Updated context managers to catch import errors.
+    * Renamed `jax.JaxBackend` class to `jax.JAXBackend`.
+    * Minor fixes to CUDA options for `torch.PyTorchBackend` class.
+* Minor fixes to `quantrl.envs` package modules.
+* Changes to `quantrl.solvers` package:
+    * Update context managers to catch import errors.
+    * Minor fixes to `jax` and `numpy` modules.
+    * Added ``'tsit5'`` option in `pytorch.TorchDiffEqIVPSolver` class.
+* Bumped version to `0.0.10` in `docs/source/conf.py` and `quantrl.__init__.py`.
+* Added tests for `quantrl.envs.stochastic` module.
+* Updated `.gitignore` and `pylintrc`.
+* Changes to `pyproject.toml`:
+    * Removed optional import for PyTorch, which is now installed as a dependency.
+    * Added `pytest` tests and renamed ``'lint'`` environment to ``'test'`` for `tox`.
+* Updated `CONTRIBUTING`, `requirements` and `README`.
+
 ## 2025/05/10 - 00 - v0.0.9 - Update Requirements
 * Added support for NumPy version `2.0+` with minimum Python version `3.12`.
 * Minor fixes to `quantrl.backends.jax` and `quantrl.io` modules.

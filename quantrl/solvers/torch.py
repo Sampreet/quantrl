@@ -6,7 +6,7 @@
 __name__    = 'quantrl.solvers.torch'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-10-14"
+__updated__ = "2025-05-11"
 
 # dependencies
 from torchdiffeq import odeint
@@ -20,12 +20,12 @@ from .base import BaseIVPSolver
 class TorchDiffEqIVPSolver(BaseIVPSolver):
     """ODE and DDE solver using TorchDiffEq-based methods for initial-value problems.
 
-    Available methods are ``'dopri8'``, ``'dopri5'``, ``'bosh3'``, ``'fehlberg2'`` and ``'adaptive_huen'``.
+    Available methods are ``'adaptive_huen'``, ``'bosh3'``, ``'dopri5'``, ``'dopri8'````'fehlberg2'`` and ``'tsit5'``.
     Refer to :class:`quantrl.backends.base.BaseIVPSolver` for its implementation.
     """
 
     # attributes
-    solver_methods = ['dopri8', 'dopri5', 'bosh3', 'fehlberg2', 'adaptive_huen']
+    solver_methods = ['adaptive_huen', 'bosh3', 'dopri5', 'dopri8', 'fehlberg2', 'tsit5']
     """list: TorchDiffEq-based methods."""
 
     def __init__(self,

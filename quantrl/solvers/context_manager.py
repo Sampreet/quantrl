@@ -6,12 +6,12 @@
 __name__    = 'quantrl.solvers.context_manager'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-10-09"
-__updated__ = "2024-10-14"
+__updated__ = "2025-05-11"
 
 # quantrl modules
 from .base import BaseIVPSolver
 
-IVP_SOLVERS = {}
+SOLVERS_IVP = {}
 
 def get_IVP_solver(
         library:str
@@ -21,26 +21,35 @@ def get_IVP_solver(
     Parameters
     ----------
     library: str
-        Name of the library. Options are ``'jax'``, ``'numpy'`` and ``'torch'``.
+        Name of the library. Options are ``'jax'``, ``'torch'`` and ``'numpy'``.
 
     Returns
     -------
     IVPSolver: :class:`quantrl.solvers.base.BaseIVPSolver`
         The IVP solver class.
     """
-    if library in IVP_SOLVERS:
-        return IVP_SOLVERS[library]
+    if library in SOLVERS_IVP:
+        return SOLVERS_IVP[library]
+
     if 'jax' in library.lower():
-        from .jax import DiffraxIVPSolver
-        IVP_SOLVERS['jax'] = DiffraxIVPSolver
-        library = 'jax'
-    elif 'torch' in library.lower():
+        try:
+            from .jax import DiffraxIVPSolver
+            SOLVERS_IVP['jax'] = DiffraxIVPSolver
+            library = 'jax'
+            return SOLVERS_IVP[library]
+        # use PyTorch if JAX is not installed
+        except ImportError:
+            print("JAX not installed, defaulting to PyTorch")
+            library = 'torch'
+
+    if 'torch' in library.lower():
         from .torch import TorchDiffEqIVPSolver
-        IVP_SOLVERS['torch'] = TorchDiffEqIVPSolver
+        SOLVERS_IVP['torch'] = TorchDiffEqIVPSolver
         library = 'torch'
-    else:
-        assert 'numpy' in library.lower(), 'parameter `library` can be either `"jax"`, `"numpy"` or `"pytorch"`'
-        from .numpy import SciPyIVPSolver
-        IVP_SOLVERS['numpy'] = SciPyIVPSolver
-        library = 'numpy'
-    return IVP_SOLVERS[library]
+        return SOLVERS_IVP[library]
+
+    assert 'numpy' in library.lower(), "parameter ``library`` can be either ``'jax'`, ``'torch'`` or ``'numpy'``"
+    from .numpy import SciPyIVPSolver
+    SOLVERS_IVP['numpy'] = SciPyIVPSolver
+    library = 'numpy'
+    return SOLVERS_IVP[library]

@@ -5,11 +5,12 @@ tqdm
 rich
 pillow
 pandas
-gymnasium
-stable-baselines3
+torch
 torchdiffeq
 jax
 diffrax
+gymnasium
+stable-baselines3
+pylint
 pytest
 pytest-cov
-pylint

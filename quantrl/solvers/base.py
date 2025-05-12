@@ -6,12 +6,12 @@
 __name__    = 'quantrl.solvers.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-10-14"
+__updated__ = "2025-05-12"
 
 # dependencies
 from abc import ABC, abstractmethod
 
-from tqdm import tqdm
+from tqdm.rich import tqdm
 
 # quantrl modules
 from ..backends.base import BaseBackend

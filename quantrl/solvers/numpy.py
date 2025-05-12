@@ -6,7 +6,7 @@
 __name__    = 'quantrl.solvers.numpy'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-10-14"
+__updated__ = "2025-05-11"
 
 # dependencies
 import scipy.integrate as si
@@ -19,7 +19,7 @@ from .base import BaseIVPSolver
 class SciPyIVPSolver(BaseIVPSolver):
     """ODE and DDE solver using SciPy-based methods for initial-value problems.
 
-    Available methods are ``'BDF'``, ``'DOP853'``, ``'LSODA'``, ``'Radau'``, ``'RK23'``, ``'RK45'``, ``'dop853'``, ``'dopri5'``, ``'lsoda'``, ``'zvode'`` and ``'vode'``.
+    Available methods are ``'BDF'``, ``'DOP853'``, ``'LSODA'``, ``'Radau'``, ``'RK23'``, ``'RK45'``, ``'dop853'``, ``'dopri5'``, ``'lsoda'``, ``'vode'`` and ``'zvode'``.
     Refer to :class:`quantrl.backends.base.BaseIVPSolver` for its implementation.
     """
 

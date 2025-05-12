@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.stochastic'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2024-10-14"
+__updated__ = "2025-05-11"
 
 # dependencies
 import numpy as np
@@ -57,7 +57,7 @@ class LinearEnv(BaseGymEnv):
     data_idxs: list
         Indices of the data to store into the ``data`` attribute. The indices can be selected from the complete set of values at each point of time (total ``1 + n_actions + n_observations + n_properties + 1`` elements in the same order, where the first element is the time and the last element is the reward).
     backend_library: str, default='numpy'
-        Solver to use for each step. Options are ``'torch'`` for PyTorch-based solvers, ``'jax'`` for JAX-based solvers and ``'numpy'`` for NumPy/SciPy-based solvers.
+        Solver to use for each step. Options are ``'jax'`` for JAX-based solvers, ``'torch'`` for PyTorch-based solvers and ``'numpy'`` for NumPy/SciPy-based solvers.
     backend_precision: str, default='double'
         Precision of the numerical values in the backend. Options are ``'single'`` and ``'double'``.
     backend_device: str, default='cuda'
@@ -71,7 +71,7 @@ class LinearEnv(BaseGymEnv):
     default_params = {}
     """dict: Default parameters of the environment."""
 
-    backend_libraries = ['torch', 'jax', 'numpy']
+    backend_libraries = ['jax', 'torch', 'numpy']
     """list: Available backend libraries."""
 
     def __init__(self,
@@ -89,14 +89,14 @@ class LinearEnv(BaseGymEnv):
         data_idxs:list,
         backend_library:str='numpy',
         backend_precision:str='double',
-        backend_device:str='gpu',
+        backend_device:str='cuda',
         dir_prefix:str='data',
         **kwargs
     ):
         """Class constructor for LinearEnv."""
 
         # validate arguments
-        assert backend_library in self.backend_libraries, f"parameter ``solver_type`` should be one of ``{self.backend_libraries}``"
+        assert backend_library in self.backend_libraries, f"parameter ``backend_library`` should be one of ``{self.backend_libraries}``"
 
         # select backend
         backend = get_backend_instance(

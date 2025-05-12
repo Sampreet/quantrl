@@ -66,11 +66,26 @@ ROOT_DIR/
 
 ### Installing in Editable Mode
 
-To install the package in editable mode, execute the following from *outside* the top-level directory, `ROOT_DIR`, inside which `setup.py` is located:
+To install the package in editable mode, execute the following from *inside* the top-level directory, `ROOT_DIR`, inside which `setup.py` is located:
 
 ```bash
-pip install -e ROOT_DIR
+python -m pip install -r requirements.txt
+python -m pip install -e .
 ```
+
+To install the JAX dependencies, use:
+
+```bash
+python -m pip install -e .[jax-cpu]
+```
+
+for the CPU version, or,
+
+```bash
+python -m pip install -e .[jax-gpu]
+```
+
+for the GPU version with CUDA 12.
 
 ### Building the Documentation
 

@@ -5,5 +5,7 @@ tqdm
 rich
 pillow
 pandas
+torch
+torchdiffeq
 gymnasium
 stable-baselines3

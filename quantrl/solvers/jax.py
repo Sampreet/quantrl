@@ -6,14 +6,14 @@
 __name__    = 'quantrl.solvers.jax'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2024-10-14"
+__updated__ = "2025-05-11"
 
 # dependencies
 import jax
 import diffrax as dfx
 
 # quantrl modules
-from ..backends.jax import JaxBackend
+from ..backends.jax import JAXBackend
 from .base import BaseIVPSolver
 
 # TODO: Implement interpolation
@@ -21,7 +21,7 @@ from .base import BaseIVPSolver
 class DiffraxIVPSolver(BaseIVPSolver):
     """ODE and DDE solver using Diffrax-based methods for initial-value problems.
 
-    Available methods are ``'dopri8'``, ``'dopri5'``, and ``'tsit5'``.
+    Available methods are ``'dopri5'``, ``'dopri8'``, and ``'tsit5'``.
     Refer to :class:`quantrl.backends.base.BaseIVPSolver` for its implementation.
     """
 
@@ -38,7 +38,7 @@ class DiffraxIVPSolver(BaseIVPSolver):
         has_delay:bool=False,
         func_delay=None,
         delay_interval:int=0,
-        backend:JaxBackend=None
+        backend:JAXBackend=None
     ):
         # initialize BaseIVPSolver
         super().__init__(
@@ -50,7 +50,7 @@ class DiffraxIVPSolver(BaseIVPSolver):
             has_delay=has_delay,
             func_delay=jax.jit(func_delay) if func_delay is not None else None,
             delay_interval=delay_interval,
-            backend=backend if backend is not None else JaxBackend(
+            backend=backend if backend is not None else JAXBackend(
                 precision='double'
             )
         )
