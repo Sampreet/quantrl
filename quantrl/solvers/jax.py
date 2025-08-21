@@ -6,7 +6,7 @@
 __name__    = 'quantrl.solvers.jax'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2025-05-11"
+__updated__ = "2025-05-29"
 
 # dependencies
 import jax
@@ -19,26 +19,34 @@ from .base import BaseIVPSolver
 # TODO: Implement interpolation
 
 class DiffraxIVPSolver(BaseIVPSolver):
-    """ODE and DDE solver using Diffrax-based methods for initial-value problems.
+    """ODE and DDE solver using
+    Diffrax-based methods
+    for initial-value problems.
 
     Available methods are ``'dopri5'``, ``'dopri8'``, and ``'tsit5'``.
-    Refer to :class:`quantrl.backends.base.BaseIVPSolver` for its implementation.
+    Refer to :class:`quantrl.backends.base.BaseIVPSolver`
+    for its implementation.
     """
 
     # attributes
-    solver_methods = ['dopri5', 'dopri8', 'tsit5']
+    solver_methods = [
+        'dopri5',
+        'dopri8',
+        'tsit5',
+    ]
     """list: Diffrax-based methods."""
 
-    def __init__(self,
-        func,
-        y_0,
-        T,
-        solver_params:dict,
-        func_controls=None,
-        has_delay:bool=False,
-        func_delay=None,
-        delay_interval:int=0,
-        backend:JAXBackend=None
+    def __init__(
+            self,
+            func,
+            y_0,
+            T,
+            solver_params:dict,
+            func_controls=None,
+            has_delay:bool=False,
+            func_delay=None,
+            delay_interval:int=0,
+            backend:JAXBackend=None,
     ):
         # initialize BaseIVPSolver
         super().__init__(
@@ -51,8 +59,8 @@ class DiffraxIVPSolver(BaseIVPSolver):
             func_delay=jax.jit(func_delay) if func_delay is not None else None,
             delay_interval=delay_interval,
             backend=backend if backend is not None else JAXBackend(
-                precision='double'
-            )
+                precision='double',
+            ),
         )
 
         # initialize solver
@@ -60,17 +68,18 @@ class DiffraxIVPSolver(BaseIVPSolver):
         self.solver = {
             'dopri5': dfx.Dopri5,
             'dopri8': dfx.Dopri8,
-            'tsit5': dfx.Tsit5
+            'tsit5': dfx.Tsit5,
         }.get(self.solver_params['method'], dfx.Dopri5)()
 
-    def integrate(self,
-        T_step,
-        y_0,
-        params=None
+    def integrate(
+            self,
+            T_step,
+            y_0,
+            params=None,
     ):
         # convert to tensor
         y_0 = self.backend.convert_to_typed(
-            tensor=y_0
+            tensor=y_0,
         )
 
         # integrate
@@ -85,12 +94,13 @@ class DiffraxIVPSolver(BaseIVPSolver):
             saveat=dfx.SaveAt(ts=T_step),
             stepsize_controller=dfx.PIDController(
                 atol=self.solver_params['atol'],
-                rtol=self.solver_params['rtol']
-            )
+                rtol=self.solver_params['rtol'],
+            ),
         ).ys
 
-    def interpolate(self,
-        T_step,
-        Y
+    def interpolate(
+            self,
+            T_step,
+            Y,
     ):
         raise NotImplementedError

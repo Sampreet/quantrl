@@ -1,5 +1,9 @@
 # Changelog
 
+## 2025/08/20 - 00 - v0.0.10 - Code Cleanup
+* Minor changes to all modules except `quantrl.solvers.measure`.
+* Updated indentations and line lengths of modules and `README`.
+
 ## 2025/05/12 - 00 - v0.0.10 - PyTorch GPU Support
 * Removed CI builds for MacOS and Windows.
 * Changes to `quantrl.backends` package:

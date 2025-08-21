@@ -6,7 +6,7 @@
 __name__    = 'quantrl.solvers.torch'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2025-05-11"
+__updated__ = "2025-05-29"
 
 # dependencies
 from torchdiffeq import odeint
@@ -18,26 +18,38 @@ from .base import BaseIVPSolver
 # TODO: Implement interpolation
 
 class TorchDiffEqIVPSolver(BaseIVPSolver):
-    """ODE and DDE solver using TorchDiffEq-based methods for initial-value problems.
+    """ODE and DDE solver using
+    TorchDiffEq-based methods
+    for initial-value problems.
 
-    Available methods are ``'adaptive_huen'``, ``'bosh3'``, ``'dopri5'``, ``'dopri8'````'fehlberg2'`` and ``'tsit5'``.
-    Refer to :class:`quantrl.backends.base.BaseIVPSolver` for its implementation.
+    Available methods are ``'adaptive_huen'``, ``'bosh3'``,
+    ``'dopri5'``, ``'dopri8'````'fehlberg2'`` and ``'tsit5'``.
+    Refer to :class:`quantrl.backends.base.BaseIVPSolver`
+    for its implementation.
     """
 
     # attributes
-    solver_methods = ['adaptive_huen', 'bosh3', 'dopri5', 'dopri8', 'fehlberg2', 'tsit5']
+    solver_methods = [
+        'adaptive_huen',
+        'bosh3',
+        'dopri5',
+        'dopri8',
+        'fehlberg2',
+        'tsit5',
+    ]
     """list: TorchDiffEq-based methods."""
 
-    def __init__(self,
-        func,
-        y_0,
-        T,
-        solver_params:dict,
-        func_controls=None,
-        has_delay:bool=False,
-        func_delay=None,
-        delay_interval:int=0,
-        backend:TorchBackend=None
+    def __init__(
+            self,
+            func,
+            y_0,
+            T,
+            solver_params:dict,
+            func_controls=None,
+            has_delay:bool=False,
+            func_delay=None,
+            delay_interval:int=0,
+            backend:TorchBackend=None,
     ):
         # initialize BaseIVPSolver
         super().__init__(
@@ -51,33 +63,39 @@ class TorchDiffEqIVPSolver(BaseIVPSolver):
             delay_interval=delay_interval,
             backend=backend if backend is not None else TorchBackend(
                 precision='double',
-                device='cuda'
-            )
+                device='cuda',
+            ),
         )
 
-    def integrate(self,
-        T_step,
-        y_0,
-        params=None
+    def integrate(
+            self,
+            T_step,
+            y_0,
+            params=None,
     ):
         # convert to tensor
         y_0 = self.backend.convert_to_typed(
-            tensor=y_0
+            tensor=y_0,
         )
 
         # integrate
         return odeint(
-            func=lambda t, y: self.func(t, y, [params, self.func_controls, self.func_delay]),
+            func=lambda t, y: self.func(
+                t,
+                y,
+                [params, self.func_controls, self.func_delay],
+            ),
             y0=y_0,
             t=T_step,
             atol=self.solver_params['atol'],
             rtol=self.solver_params['rtol'],
             method=self.solver_params['method'],
-            options={}
+            options={},
         )
 
-    def interpolate(self,
-        T_step,
-        Y
+    def interpolate(
+            self,
+            T_step,
+            Y,
     ):
         raise NotImplementedError

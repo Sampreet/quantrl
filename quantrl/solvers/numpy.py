@@ -6,7 +6,7 @@
 __name__    = 'quantrl.solvers.numpy'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2025-05-11"
+__updated__ = "2025-05-29"
 
 # dependencies
 import scipy.integrate as si
@@ -17,30 +17,49 @@ from ..backends.numpy import NumPyBackend
 from .base import BaseIVPSolver
 
 class SciPyIVPSolver(BaseIVPSolver):
-    """ODE and DDE solver using SciPy-based methods for initial-value problems.
+    """ODE and DDE solver using
+    SciPy-based methods
+    for initial-value problems.
 
-    Available methods are ``'BDF'``, ``'DOP853'``, ``'LSODA'``, ``'Radau'``, ``'RK23'``, ``'RK45'``, ``'dop853'``, ``'dopri5'``, ``'lsoda'``, ``'vode'`` and ``'zvode'``.
-    Refer to :class:`quantrl.backends.base.BaseIVPSolver` for its implementation.
+    Available methods are ``'BDF'``, ``'DOP853'``, ``'LSODA'``,
+    ``'Radau'``, ``'RK23'``, ``'RK45'``, ``'dop853'``,
+    ``'dopri5'``, ``'lsoda'``, ``'vode'`` and ``'zvode'``.
+    Refer to :class:`quantrl.backends.base.BaseIVPSolver`
+    for its implementation.
     """
 
     # attributes
-    scipy_new_methods = ['BDF', 'DOP853', 'LSODA', 'Radau', 'RK23', 'RK45']
-    """list: New Python-based methods availabile in :class:`scipy.integrate`."""
-    scipy_old_methods = ['dop853', 'dopri5', 'lsoda', 'vode', 'zvode']
-    """list: Old FORTRAN-based methods availabile in :class:`scipy.integrate`."""
+    scipy_new_methods = [
+        'BDF',
+        'DOP853',
+        'LSODA',
+        'Radau',
+        'RK23',
+        'RK45',
+    ]
+    """list: Python-based methods availabile in :class:`scipy.integrate`."""
+    scipy_old_methods = [
+        'dop853',
+        'dopri5',
+        'lsoda',
+        'vode',
+        'zvode',
+    ]
+    """list: FORTRAN-based methods availabile in :class:`scipy.integrate`."""
     solver_methods = scipy_new_methods + scipy_old_methods
     """list: SciPy-based methods availabile in :class:`scipy.integrate`."""
 
-    def __init__(self,
-        func,
-        y_0,
-        T,
-        solver_params:dict,
-        func_controls=None,
-        has_delay:bool=False,
-        func_delay=None,
-        delay_interval:int=0,
-        backend:NumPyBackend=None
+    def __init__(
+            self,
+            func,
+            y_0,
+            T,
+            solver_params:dict,
+            func_controls=None,
+            has_delay:bool=False,
+            func_delay=None,
+            delay_interval:int=0,
+            backend:NumPyBackend=None,
     ):
         # initialize BaseIVPSolver
         super().__init__(
@@ -53,8 +72,8 @@ class SciPyIVPSolver(BaseIVPSolver):
             func_delay=func_delay,
             delay_interval=delay_interval,
             backend=backend if backend is not None else NumPyBackend(
-                precision='double'
-            )
+                precision='double',
+            ),
         )
 
         # flatten function for integration
@@ -68,8 +87,8 @@ class SciPyIVPSolver(BaseIVPSolver):
                         tensor=y,
                         shape=self.shape_y
                     ),
-                    args=args
-                )
+                    args=args,
+                ),
             )
             self.is_y_flat = False
 
@@ -81,43 +100,45 @@ class SciPyIVPSolver(BaseIVPSolver):
                 name=self.solver_params['method'],
                 atol=self.solver_params['atol'],
                 rtol=self.solver_params['rtol'],
-                method='bdf' if self.solver_params['is_stiff'] else 'adams'
+                method='bdf' if self.solver_params['is_stiff'] else 'adams',
             )
 
-    def integrate(self,
-        T_step,
-        y_0,
-        params=None
+    def integrate(
+            self,
+            T_step,
+            y_0,
+            params=None,
     ):
         # convert to tensor
         y_0 = self.backend.convert_to_typed(
-            tensor=y_0
+            tensor=y_0,
         )
 
         # flatten
         y_0_flat = y_0
         if not self.is_y_flat:
             y_0_flat = self.backend.flatten(
-                tensor=y_0
+                tensor=y_0,
             )
 
         # integrate
         _Y_flat = self.integrate_flat(
             y_0_flat=y_0_flat,
             T_step=T_step,
-            args=[params, self.func_controls, self.func_delay]
+            args=[params, self.func_controls, self.func_delay],
         )
 
         # reshape
         return self.backend.reshape(
             tensor=_Y_flat,
-            shape=(len(T_step), *self.shape_y)
+            shape=(len(T_step), *self.shape_y),
         )
 
-    def integrate_flat(self,
-        T_step,
-        y_0_flat,
-        args:tuple
+    def integrate_flat(
+            self,
+            T_step,
+            y_0_flat,
+            args:tuple,
     ):
         """Method to take one integration step.
         
@@ -135,6 +156,7 @@ class SciPyIVPSolver(BaseIVPSolver):
         Y: Any
             Values of the variables at the given points of time.
         """
+
         # convert to tensor
         y_0_flat = self.backend.convert_to_typed(
             tensor=y_0_flat
@@ -147,14 +169,14 @@ class SciPyIVPSolver(BaseIVPSolver):
                     *self.backend.shape(
                         tensor=T_step
                     ),
-                    *y_0_flat.shape
+                    *y_0_flat.shape,
                 ),
-                dtype='complex' if self.solver_params['complex'] else 'real'
+                dtype='complex' if self.solver_params['complex'] else 'real',
             )
             _Y_flat[0] = y_0_flat
             self.integrator.set_initial_value(
                 y=y_0_flat,
-                t=T_step[0]
+                t=T_step[0],
             )
             self.integrator.set_f_params(args)
             for i in range(1, len(T_step)):
@@ -171,18 +193,19 @@ class SciPyIVPSolver(BaseIVPSolver):
                     method=self.solver_params['method'],
                     atol=self.solver_params['atol'],
                     rtol=self.solver_params['rtol'],
-                    args=(args, )
-                ).y
+                    args=(args, ),
+                ).y,
             )
 
         return _Y_flat
 
-    def interpolate(self,
-        T_step,
-        Y
+    def interpolate(
+            self,
+            T_step,
+            Y,
     ):
         _shape = self.backend.shape(
-            tensor=Y
+            tensor=Y,
         )[1]
         b_spline = [splrep(T_step, Y[:, j]) for j in range(_shape)]
         return lambda t: [splev(t, b_spline[j]) for j in range(_shape)]

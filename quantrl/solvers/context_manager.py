@@ -6,28 +6,33 @@
 __name__    = 'quantrl.solvers.context_manager'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-10-09"
-__updated__ = "2025-05-11"
+__updated__ = "2025-05-29"
+
+# dependencies
+from typing import Type
 
 # quantrl modules
 from .base import BaseIVPSolver
 
 SOLVERS_IVP = {}
 
-def get_IVP_solver(
+def get_solver_ivp(
         library:str
-    ) -> BaseIVPSolver:
+    ) -> Type[BaseIVPSolver]:
     """Method to obtain an IVP solver class.
     
     Parameters
     ----------
     library: str
-        Name of the library. Options are ``'jax'``, ``'torch'`` and ``'numpy'``.
+        Name of the library for the solver.
+        Options are ``'jax'``, ``'torch'`` and ``'numpy'``.
 
     Returns
     -------
     IVPSolver: :class:`quantrl.solvers.base.BaseIVPSolver`
         The IVP solver class.
     """
+
     if library in SOLVERS_IVP:
         return SOLVERS_IVP[library]
 
@@ -48,7 +53,8 @@ def get_IVP_solver(
         library = 'torch'
         return SOLVERS_IVP[library]
 
-    assert 'numpy' in library.lower(), "parameter ``library`` can be either ``'jax'`, ``'torch'`` or ``'numpy'``"
+    assert 'numpy' in library.lower(), \
+        "parameter ``library`` can be either ``'jax'``, ``'torch'`` or ``'numpy'``"
     from .numpy import SciPyIVPSolver
     SOLVERS_IVP['numpy'] = SciPyIVPSolver
     library = 'numpy'
