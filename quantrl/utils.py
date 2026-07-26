@@ -127,8 +127,9 @@ class SaveOnBestMeanRewardCallback(BaseCallback):
                     # save model and replay buffer
                     self.model.save(self.log_dir \
                         + f"models/best_{self.n_episodes - 1}.zip")
-                    self.model.save_replay_buffer(self.log_dir \
-                        + f"buffers/best_{self.n_episodes - 1}.zip")
+                    if getattr(self.model, "save_replay_buffer", None) is not None:
+                        self.model.save_replay_buffer(self.log_dir \
+                            + f"buffers/best_{self.n_episodes - 1}.zip")
 
                 # save reward data
                 with open(

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026/07/16 - 00 - v0.0.11 - Add Support for Tuple Spaces
+* Added support for tuple spaces to combine discrete and continuious actions in `quantrl.envs.base` module.
+* Added option for maximum number of steps for `DiffraxIVPSolver` in `quantrl.solver.jax` module.
+* Minor updates to `quantrl.backends.torch` module.
+
 ## 2025/08/20 - 00 - v0.0.10 - Code Cleanup
 * Minor changes to all modules except `quantrl.solvers.measure`.
 * Updated indentations and line lengths of modules and `README`.

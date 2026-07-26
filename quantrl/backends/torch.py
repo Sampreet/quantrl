@@ -71,12 +71,12 @@ class TorchBackend(BaseBackend):
 
     def convert_to_numpy(
             self,
-            tensor,
+            tensor:torch.Tensor,
             dtype:str=None,
     ) -> np.ndarray:
         if self.is_typed(
             tensor=tensor,
-            dtype=dtype,
+            dtype=None,
         ):
             return np.asarray(
                 tensor.detach().cpu().numpy() \

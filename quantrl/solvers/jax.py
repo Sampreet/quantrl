@@ -6,7 +6,7 @@
 __name__    = 'quantrl.solvers.jax'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2025-05-29"
+__updated__ = "2026-07-17"
 
 # dependencies
 import jax
@@ -96,6 +96,7 @@ class DiffraxIVPSolver(BaseIVPSolver):
                 atol=self.solver_params['atol'],
                 rtol=self.solver_params['rtol'],
             ),
+            max_steps=self.solver_params['step_max'],
         ).ys
 
     def interpolate(

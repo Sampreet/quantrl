@@ -6,7 +6,7 @@
 __name__    = 'quantrl.solvers.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2025-08-20"
+__updated__ = "2026-07-16"
 
 # dependencies
 from abc import ABC, abstractmethod
@@ -54,6 +54,10 @@ class BaseIVPSolver(ABC):
             step_interval       (*bool*) number of steps to jump during
                                 integration. Higher values give faster results.
                                 Default is ``10``.
+            step_max            (*int*) maximum number of steps to take
+                                before the computation is terminated,
+                                used by :class:`quantrl.solvers.jax.DiffraxIVPSolver`.
+                                Default is ``10_000``.
             ================    ============================================
     func_controls: callable
         Function for the controls in the format ``func_controls(t)``.
@@ -79,6 +83,7 @@ class BaseIVPSolver(ABC):
         'is_stiff': False,
         'step_interval': 10,
         'complex': False,
+        'step_max': 10_000,
     }
     """dict: Default parameters of the solver."""
     solver_methods = []
@@ -127,7 +132,7 @@ class BaseIVPSolver(ABC):
         for key, _ in self.default_solver_params.items():
             self.solver_params[key] = solver_params.get(
                 key,
-                self.default_solver_params[key]
+                self.default_solver_params[key],
             )
         # override step dimension with delay interval if DDE
         if self.has_delay and self.delay_interval != 0:

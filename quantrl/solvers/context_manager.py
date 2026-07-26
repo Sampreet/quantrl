@@ -44,7 +44,7 @@ def get_solver_ivp(
             return SOLVERS_IVP[library]
         # use PyTorch if JAX is not installed
         except ImportError:
-            print("JAX not installed, defaulting to PyTorch")
+            print("JAX or Diffrax not installed, defaulting to PyTorch")
             library = 'torch'
 
     if 'torch' in library.lower():

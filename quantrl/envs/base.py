@@ -6,14 +6,14 @@
 __name__    = 'quantrl.envs.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2025-08-20"
+__updated__ = "2026-07-16"
 
 # dependencies
 from abc import ABC, abstractmethod
 import sys
 
 from gymnasium import Env
-from gymnasium.spaces import Box, MultiDiscrete
+from gymnasium.spaces import Box, MultiDiscrete, Tuple
 import numpy as np
 from stable_baselines3.common import env_util
 from stable_baselines3.common.vec_env import VecEnv
@@ -86,8 +86,17 @@ class BaseEnv(ABC):
                                     is scaled by the corresponding action
                                     multiplier. Default is ``[-1.0, 1.0]``.
         action_space_type           (*str*) the type of action space.
-                                    Options are ``'binary'`` and ``'box'``.
+                                    Options are ``'discrete'``, ``'multidiscrete'``,
+                                    ``'box'`` and ``'tuple'``.
                                     Default is ``'box'``.
+        action_space_seed           (*int*) the seed for the action space.
+                                    Default is ``None``.
+        action_space_tuple          (*tuple*) dictionaries of action spaces containing
+                                    the keys ``'type'`` for the type of action space and
+                                    ``'range'`` for the range of the action space.
+                                    Currently, only ``'discrete'`` and ``'box'`` types
+                                    are supported for tuples. Default is a dictionary
+                                    with the parameters of a box action space.
         seed                        (*int*) seed to initialize random number
                                     generators. If ``None``, a random integer
                                     seed is generated. Default is ``None``.
@@ -142,6 +151,12 @@ class BaseEnv(ABC):
         'observation_stds': None,
         'action_space_range': [-1.0, 1.0],
         'action_space_type': 'box',
+        'action_space_seed': None,
+        'action_space_tuple': ({
+            'type': 'box',
+            'n_actions': 1,
+            'range': [-1.0, 1.0],
+        }, ),
         'seed': None,
         'cache_all_data': True,
         'cache_dump_interval': 100,
@@ -192,8 +207,8 @@ class BaseEnv(ABC):
             "parameter ``n_properties`` should be non-negative"
         assert action_interval > 0, \
             "parameter ``action_interval`` should be a positive integer"
-        assert len(data_idxs) > 0, \
-            "parameter ``data_idxs`` should be a list containing at least one element"
+        assert data_idxs is None or len(data_idxs) > 0, \
+            "parameter ``data_idxs`` should be a list containing at least one element or ``None``"
         assert kwargs['observation_stds'] is None \
             or isinstance(kwargs['observation_stds'], list), \
             "parameter ``observation_stds`` should be a list"
@@ -213,8 +228,9 @@ class BaseEnv(ABC):
             "parameter ``action_space_range`` should contain " \
                 + "two elements for the minimum and maximum values, " \
                 + "both inclusive"
-        assert kwargs['action_space_type'] in ['binary', 'box'], \
-            "parameter ``action_space_type`` can be either ``'binary'`` or ``'box'``"
+        assert kwargs['action_space_type'] in ['discrete', 'multidiscrete', 'box', 'tuple'], \
+            "parameter ``action_space_type`` can be either \
+                ``'discrete'``, ``'multidiscrete'``, ``'box'`` or ``'tuple'``"
         assert kwargs['cache_dump_interval'] > 0, \
             "parameter ``cache_dump_interval`` should be a positive integer"
 
@@ -264,24 +280,70 @@ class BaseEnv(ABC):
         # action attributes
         self.n_actions = n_actions
         self.action_space_type = kwargs['action_space_type']
+        self.action_space_seed = kwargs['action_space_seed']
         # discrete actions
-        if self.action_space_type == 'binary':
-            self.action_space_range = [0, 1]
+        if self.action_space_type == 'discrete':
+            _range = kwargs['action_space_range']
+            _diff = _range[1] - _range[0]
             self.action_space = MultiDiscrete(
-                nvec=[2] * self.n_actions,
+                nvec=[_diff] * self.n_actions,
+                dtype=self.numpy_int,
+                seed=self.action_space_seed,
+                start=[_range[0]] * self.n_actions,
+            )
+        elif self.action_space_type == 'multidiscrete':
+            _ranges = kwargs['action_space_ranges']
+            _diffs = [_range[1] - _range[0] for _range in _ranges]
+            self.action_space = MultiDiscrete(
+                nvec=_diffs,
+                dtype=self.numpy_int,
+                seed=self.action_space_seed,
+                start=[_range[0] for _range in _ranges],
             )
         # continuous actions
-        else:
+        elif self.action_space_type == 'box':
             self.action_space_range = kwargs['action_space_range']
             self.action_space = Box(
                 low=self.action_space_range[0],
                 high=self.action_space_range[1],
                 shape=(self.n_actions, ),
                 dtype=self.numpy_real,
+                seed=self.action_space_seed,
+            )
+        # custom ordered actions
+        else:
+            self.action_space_tuple = kwargs['action_space_tuple']
+            spaces = []
+            _n_actions = 0
+            for entry in self.action_space_tuple:
+                if entry['type'] == 'discrete':
+                    _diff = entry['range'][1] - entry['range'][0]
+                    space = MultiDiscrete(
+                        nvec=[_diff] * entry['n_actions'],
+                        dtype=self.numpy_int,
+                        seed=self.action_space_seed,
+                        start=[entry['range'][0]] * entry['n_actions'],
+                    )
+                else:
+                    space = Box(
+                        low=entry['range'][0],
+                        high=entry['range'][1],
+                        shape=(entry['n_actions'], ),
+                        dtype=self.numpy_real,
+                        seed=self.action_space_seed,
+                    )
+                _n_actions += entry['n_actions']
+                spaces.append(space)
+            assert _n_actions == self.n_actions, \
+                "sum of the number of actions of all subspaces \
+                    should be equal to the total number of actoins ``n_actions``"
+            self.action_space = Tuple(
+                spaces=spaces,
+                seed=self.action_space_seed,
             )
         self.action_maximums = self.backend.convert_to_typed(
             tensor=action_maximums,
-            dtype='integer' if self.action_space_type == 'binary' else 'real'
+            dtype='integer' if self.action_space_type == 'discrete' else 'real'
         )
         self.action_interval = action_interval
         self.action_steps = self.numpy_int(
@@ -312,7 +374,8 @@ class BaseEnv(ABC):
         self.average_over = self.numpy_int(kwargs['average_over'])
 
         # initialize IO
-        self.data_idxs = data_idxs
+        self.data_idxs = data_idxs if data_idxs is not None else \
+            list(range(self.n_data))
         self.cache_all_data = kwargs['cache_all_data']
         self.cache_dump_interval = kwargs['cache_dump_interval']
         self.io = FileIO(
