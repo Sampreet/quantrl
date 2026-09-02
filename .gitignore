@@ -2,9 +2,9 @@
 .vscode/
 
 # cache files
-temp*/
 data*/
 img*/
+temp*/
 
 # Jupyter Notebook Checkpoints
 *.ipynb_checkpoints/
@@ -49,6 +49,7 @@ pip-delete-this-directory.txt
 
 # Unit test / coverage reports
 htmlcov/
+.pytest_cache/
 .tox/
 .coverage
 .coverage.*
@@ -57,6 +58,7 @@ nosetests.xml
 coverage.xml
 *,cover
 .hypothesis/
+.benchmarks/
 
 # Translations
 *.mo

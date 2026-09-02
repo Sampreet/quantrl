@@ -1,5 +1,5 @@
 [build-system]
-requires = ["cython", "setuptools>=61", "wheel"]
+requires = ["cython", "setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -20,14 +20,17 @@ keywords = [
 ]
 readme = "README.md"
 license = {file = "LICENSE"}
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
-    "numpy<2.0.0",
+    "numpy",
     "scipy",
     "matplotlib",
     "tqdm",
+    "rich",
     "pillow",
     "pandas",
+    "torch",
+    "torchdiffeq",
     "gymnasium",
     "stable-baselines3",
 ]
@@ -48,12 +51,6 @@ jax-cpu = [
 jax-gpu = [
     "jax[cuda12]",
     "diffrax",
-]
-torch = [
-    "torch",
-    "torchvision",
-    "torchaudio",
-    "torchdiffeq",
 ]
 
 [project.urls]
@@ -76,12 +73,13 @@ requires =
     tox>=4
     virtualenv>=20
 env_list =
-    lint
+    test
 
-[testenv:lint]
-description = run pylint under {base_python}
+[testenv:test]
+description = run tests under {base_python}
 deps =
     -r requirements_tox.txt
 commands =
-    pylint quantrl
+    pylint quantrl tests
+    pytest tests --cov=quantrl --cov-report=term-missing
 """

@@ -7,14 +7,14 @@ disable=too-many-lines,
         too-many-public-methods,
         too-many-instance-attributes,
         too-many-positional-arguments,
-        line-too-long,                  # no bounded lines
+        line-too-long,                  # catches docstring tables
         redefined-builtin,              # catches __name__
         duplicate-code,                 # catches __init__
         unused-argument,                # catches Gym.Env methods
-        import-outside-toplevel,        # for numerical libraries
+        import-outside-toplevel,        # for context managers
         not-callable,                   # catches JAX JIT functions
-        fixme
-
+        unnecessary-lambda,             # catches JAX JIT functions
+        fixme,
 [BASIC]
 attr-naming-style=any
 variable-naming-style=any

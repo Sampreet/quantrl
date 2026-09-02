@@ -1,5 +1,46 @@
 # Changelog
 
+## 2026/09/02 - 00 - v0.1.0 - Bump version and Minor Fixes
+* Minor fixes to `quantrl.backends.jax`, `quantrl.envs.base` and `quantrl.envs.stochastic` modules.
+* Renamed ``seed`` to ``noise_seed`` in `quantrl.envs.base` module.
+* Updated ``LearningCurvePlotter`` class in `quantrl.plotters` module.
+* Bump version in `docs/source/conf.py`, `quantrl.__init__.py`.
+* Updated `README`.
+
+## 2026/07/16 - 00 - v0.0.11 - Add Support for Tuple Spaces
+* Added support for tuple spaces to combine discrete and continuious actions in `quantrl.envs.base` module.
+* Added option for maximum number of steps for `DiffraxIVPSolver` in `quantrl.solver.jax` module.
+* Minor updates to `quantrl.backends.torch` module.
+
+## 2025/08/20 - 00 - v0.0.10 - Code Cleanup
+* Minor changes to all modules except `quantrl.solvers.measure`.
+* Updated indentations and line lengths of modules and `README`.
+
+## 2025/05/12 - 00 - v0.0.10 - PyTorch GPU Support
+* Removed CI builds for MacOS and Windows.
+* Changes to `quantrl.backends` package:
+    * Updated context managers to catch import errors.
+    * Renamed `jax.JaxBackend` class to `jax.JAXBackend`.
+    * Minor fixes to CUDA options for `torch.PyTorchBackend` class.
+* Minor fixes to `quantrl.envs` package modules.
+* Changes to `quantrl.solvers` package:
+    * Update context managers to catch import errors.
+    * Minor fixes to `jax` and `numpy` modules.
+    * Added ``'tsit5'`` option in `pytorch.TorchDiffEqIVPSolver` class.
+* Bumped version to `0.0.10` in `docs/source/conf.py` and `quantrl.__init__.py`.
+* Added tests for `quantrl.envs.stochastic` module.
+* Updated `.gitignore` and `pylintrc`.
+* Changes to `pyproject.toml`:
+    * Removed optional import for PyTorch, which is now installed as a dependency.
+    * Added `pytest` tests and renamed ``'lint'`` environment to ``'test'`` for `tox`.
+* Updated `CONTRIBUTING`, `requirements` and `README`.
+
+## 2025/05/10 - 00 - v0.0.9 - Update Requirements
+* Added support for NumPy version `2.0+` with minimum Python version `3.12`.
+* Minor fixes to `quantrl.backends.jax` and `quantrl.io` modules.
+* Minor changes to `CONTRIBUTING.md` and `pylintrc`.
+* Updated `README`, `pyproject.toml` and `requirements`.
+
 ## 2024/10/14 - 00 - v0.0.8 - Instantiation and GitHub CI
 * Instantiated backends and solvers with different numerical libraries:
     * Added `context_manager` modules to `quantrl.backends` and `quantrl.solvers` packages.

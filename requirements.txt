@@ -1,8 +1,11 @@
-numpy<2.0.0
+numpy
 scipy
 matplotlib
 tqdm
+rich
 pillow
 pandas
+torch
+torchdiffeq
 gymnasium
 stable-baselines3

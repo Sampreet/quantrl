@@ -6,7 +6,7 @@
 __name__    = 'quantrl.plotters'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-12-08"
-__updated__ = "2024-10-14"
+__updated__ = "2026-09-02"
 
 # dependencies
 from io import BytesIO
@@ -44,29 +44,39 @@ class TrajectoryPlotter():
     Parameters
     ----------
     axes_args: list
-        Lists of axis properties. The first element of each entry is the ``x_label``, the second is ``y_label``, the third is ``[y_limit_min, y_limit_max]`` and the fourth is ``y_scale``.
+        Lists of axis properties.
+        The first element of each entry is the ``x_label``,
+        the second is ``y_label``,
+        the third is ``[y_limit_min, y_limit_max]`` and
+        the fourth is ``y_scale``.
     axes_lines_max: int, default=10
-        Maximum number of lines to display in each plot. Higher numbers slow down the run. Default is ``10``.
+        Maximum number of lines to display in each plot.
+        Higher numbers slow down the run. Default is ``10``.
     axes_cols: int, default=2
-        Number of columns in the figure. Default is ``2``.
+        Number of columns in the figure.
+        Default is ``2``.
     show_title: bool, default=True
         Option to display the trajectory index as title.
     save_dir: str, default=None
-        Directory to save the plots on each update. If ``None``, the plots are not saved.
+        Directory to save the plots on each update.
+        If ``None``, the plots are not saved.
     """
 
-    def __init__(self,
-        axes_args:list,
-        axes_lines_max:int=10,
-        axes_cols:int=2,
-        show_title:bool=True,
-        save_dir:str=None
+    def __init__(
+            self,
+            axes_args:list,
+            axes_lines_max:int=10,
+            axes_cols:int=2,
+            show_title:bool=True,
+            save_dir:str=None,
     ):
         """Class constructor for TrajectoryPlotter."""
 
         # validate
-        assert axes_lines_max >= 0, "parameter ``axes_lines_max`` should be a non-negative integer"
-        assert axes_cols > 0, "parameter ``axes_cols`` should be a positive integer"
+        assert axes_lines_max >= 0, \
+            "parameter ``axes_lines_max`` should be a non-negative integer"
+        assert axes_cols > 0, \
+            "parameter ``axes_cols`` should be a positive integer"
 
         # set attributes
         self.axes_args = axes_args
@@ -87,8 +97,16 @@ class TrajectoryPlotter():
 
         # initialize variables
         self.axes_rows = int(np.ceil(len(self.axes_args) / self.axes_cols))
-        self.fig = plt.figure(figsize=(6.0 * self.axes_cols, 3.0 * self.axes_rows))
-        self.gspec = GridSpec(self.axes_rows, self.axes_cols, figure=self.fig, width_ratios=[0.2] * self.axes_cols)
+        self.fig = plt.figure(figsize=(
+            6.0 * self.axes_cols,
+            3.0 * self.axes_rows,
+        ))
+        self.gspec = GridSpec(
+            self.axes_rows,
+            self.axes_cols,
+            figure=self.fig,
+            width_ratios=[0.2] * self.axes_cols,
+        )
         self.axes = []
         self.lines = None
 
@@ -109,17 +127,18 @@ class TrajectoryPlotter():
                 ax.set_yscale(ax_args[3])
                 self.axes.append(ax)
         if self.show_title:
-            self.fig.suptitle('#0')
+            self.fig.suptitle("#0")
         self.fig.tight_layout()
 
         # initialize buffers
         self.frames = []
 
-    def plot_lines(self,
-        xs,
-        Y,
-        traj_idx=0,
-        update_buffer=False
+    def plot_lines(
+            self,
+            xs,
+            Y,
+            traj_idx=0,
+            update_buffer=False,
     ):
         """Method to plot new lines.
 
@@ -143,12 +162,13 @@ class TrajectoryPlotter():
         # add new lines
         self.lines = []
         for i, ax in enumerate(self.axes):
-            if self.axes_lines_max and len(ax.get_lines()) >= self.axes_lines_max:
+            if self.axes_lines_max \
+                and len(ax.get_lines()) >= self.axes_lines_max:
                 line = ax.get_lines()[0]
                 line.remove()
             self.lines.append(ax.plot(xs, Y[:, i])[0])
         if self.show_title:
-            self.fig.suptitle('#' + str(traj_idx))
+            self.fig.suptitle("#" + str(traj_idx))
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
 
@@ -161,14 +181,15 @@ class TrajectoryPlotter():
         # save plot
         if self.save_dir is not None:
             self.save_plot(
-                file_name=self.save_dir + '/traj_' + str(traj_idx)
+                file_name=self.save_dir + "/traj_" + str(traj_idx),
             )
             self.save_plot(
-                file_name=self.save_dir + '_latest'
+                file_name=self.save_dir + "_latest",
             )
 
-    def make_gif(self,
-        file_name:str
+    def make_gif(
+            self,
+            file_name:str,
     ):
         """Method to create a gif file from the frame buffer.
 
@@ -184,14 +205,22 @@ class TrajectoryPlotter():
 
         # dump buffer
         frame = self.frames[0]
-        frame.save(file_name + '.gif', format='GIF', append_images=self.frames[1:], save_all=True, duration=50, loop=0)
+        frame.save(
+            file_name + ".gif",
+            format='GIF',
+            append_images=self.frames[1:],
+            save_all=True,
+            duration=50,
+            loop=0,
+        )
 
         # reset buffer
         del self.frames
         self.frames = []
 
-    def save_plot(self,
-        file_name:str
+    def save_plot(
+            self,
+            file_name:str,
     ):
         """Method to save the plot.
 
@@ -232,35 +261,52 @@ class LearningCurvePlotter():
     Parameters
     ----------
     axes_args: list
-        Lists of axis properties. The first element of each entry is the ``x_label``, the second is ``y_label``, the third is ``[y_limit_min, y_limit_max]`` and the fourth is ``y_scale``.
+        Lists of axis properties.
+        The first element of each entry is the ``x_label``,
+        the second is ``y_label``,
+        the third is ``[y_limit_min, y_limit_max]`` and
+        the fourth is ``y_scale``.
     average_over: int, default=100
         Number of points to average over.
     percentiles: list, default=None
-        Percentile values for intraquartile ranges. If ``None``, the percentiles are set to ``[25, 50, 75]``.
+        Percentile values for intraquartile ranges.
+        If ``None``, the percentiles are set to ``[25, 50, 75]``.
+    kwargs : dict
+        Other keyword arguments for figure and label and tick font properties
+        (with keys ``"label_fontdict"`` and ``"tick_fontdict"``).
     """
 
-    def __init__(self,
-        axis_args:list,
-        average_over:int=100,
-        percentiles:list=None
+    def __init__(
+            self,
+            axis_args:list,
+            average_over:int=100,
+            percentiles:list=None,
+            **kwargs,
     ):
         """Class constructor for LearningCurvePlotter."""
 
         # set attributes
         self.axis_args = axis_args
         self.average_over = average_over
-        self.percentiles = percentiles if percentiles is not None else [25, 50, 75]
+        self.percentiles = percentiles \
+            if percentiles is not None \
+            else [25, 50, 75]
 
         # turn on interactive mode
         plt.ion()
 
         # initialize plot
-        self.fig = plt.figure(figsize=(6.0, 3.0))
+        figsize = kwargs.get("figsize", (6.0, 3.0))
+        label_fontdict = kwargs.get("label_fontdict", None)
+        tick_fontdict = kwargs.get("tick_fontdict", None)
+        self.fig = plt.figure(figsize=figsize)
         self.ax = plt.gca()
-        self.ax.set_xlabel(self.axis_args[0])
-        self.ax.set_ylabel(self.axis_args[1])
+        self.ax.set_xlabel(self.axis_args[0], fontdict=label_fontdict)
+        self.ax.set_ylabel(self.axis_args[1], fontdict=label_fontdict)
         self.ax.set_ylim(ymin=self.axis_args[2][0], ymax=self.axis_args[2][1])
         self.ax.set_yscale(self.axis_args[3])
+        if isinstance(tick_fontdict, dict):
+            self.ax.tick_params(labelsize=tick_fontdict.get("size", 14))
         self.fig.tight_layout()
 
         # initialze buffer
@@ -268,12 +314,13 @@ class LearningCurvePlotter():
         self.line = None
         self.line_faint = None
 
-    def add_data(self,
-        data_rewards:np.ndarray,
-        renew:bool=False,
-        color:str='k',
-        style:str='-',
-        width:float=1.5
+    def add_data(
+            self,
+            data_rewards:np.ndarray,
+            renew:bool=False,
+            color:str='k',
+            style:str='-',
+            width:float=1.5,
     ):
         """Method to add reward data.
 
@@ -294,7 +341,11 @@ class LearningCurvePlotter():
         # if averaging opted
         data_rewards_smooth = data_rewards
         if self.average_over is not None:
-            data_rewards_smooth = np.convolve(data_rewards, np.ones((self.average_over, )) / float(self.average_over), mode='valid')
+            data_rewards_smooth = np.convolve(
+                data_rewards,
+                np.ones((self.average_over, )) / float(self.average_over),
+                mode='valid',
+            )
 
         # update data
         if renew:
@@ -306,27 +357,59 @@ class LearningCurvePlotter():
             self.line_faint.remove()
         if self.line is not None:
             self.line.remove()
-        xs = list(range(self.average_over, len(self.data[0]) + self.average_over))
+        xs = list(range(
+            self.average_over,
+            len(self.data[0]) + self.average_over,
+        ))
 
         # if single entry
         if len(self.data) == 1:
             q_mean = data_rewards_smooth
-            self.line_faint = self.ax.plot(xs, data_rewards[self.average_over - 1:], c=color, alpha=0.1, linewidth=0.5)[0]
+            self.line_faint = self.ax.plot(
+                xs,
+                data_rewards[self.average_over - 1:],
+                c=color,
+                alpha=0.1,
+                linewidth=0.5,
+            )[0]
         else:
             # if interquartile ranges given
             if self.percentiles is not None:
-                q_min, q_mean, q_max = np.percentile(self.data, self.percentiles, 0)
-                self.line_faint = self.ax.fill_between(xs, q_min, q_max, facecolor=color, alpha=0.1)
+                q_min, q_mean, q_max = np.percentile(
+                    self.data,
+                    self.percentiles,
+                    0,
+                )
+                self.line_faint = self.ax.fill_between(
+                    xs,
+                    q_min,
+                    q_max,
+                    facecolor=color,
+                    alpha=0.2,
+                )
             # calculate mean
             else:
                 q_mean = np.mean(self.data, 0)
-                self.line_faint = self.ax.plot(xs, q_mean, c=color, alpha=0.1, linewidth=0.5)[0]
+                self.line_faint = self.ax.plot(
+                    xs,
+                    q_mean,
+                    c=color,
+                    alpha=0.1,
+                    linewidth=0.5,
+                )[0]
 
         # add new lines
-        self.line = self.ax.plot(xs, q_mean, c=color, linestyle=style, linewidth=width)[0]
+        self.line = self.ax.plot(
+            xs,
+            q_mean,
+            c=color,
+            linestyle=style,
+            linewidth=width,
+        )[0]
 
-    def save_plot(self,
-        file_name:str
+    def save_plot(
+            self,
+            file_name:str,
     ):
         """Method to save the plot.
 
