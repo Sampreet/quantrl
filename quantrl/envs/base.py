@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.base'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2026-07-16"
+__updated__ = "2026-08-13"
 
 # dependencies
 from abc import ABC, abstractmethod
@@ -97,7 +97,7 @@ class BaseEnv(ABC):
                                     Currently, only ``'discrete'`` and ``'box'`` types
                                     are supported for tuples. Default is a dictionary
                                     with the parameters of a box action space.
-        seed                        (*int*) seed to initialize random number
+        noise_seed                  (*int*) seed to initialize random number
                                     generators. If ``None``, a random integer
                                     seed is generated. Default is ``None``.
         cache_all_data              (*bool*) option to cache all data to disk.
@@ -355,7 +355,7 @@ class BaseEnv(ABC):
         self.t_delay = self.T[self.action_interval] - self.T[0]
 
         # initialize seed
-        self.seed = kwargs['seed']
+        self.noise_seed = kwargs['seed']
 
         # data constants
         self.dir_path = dir_prefix + "/" + "_".join([
@@ -422,7 +422,7 @@ class BaseEnv(ABC):
         States: Any
             The updated states with shape either 
             ``(action_interval + 1, n_observations)`` or 
-            ``(action_interval + 1, n_envs, n_observations).
+            ``(action_interval + 1, n_envs, n_observations)``.
         """
 
         raise NotImplementedError
@@ -571,7 +571,7 @@ class BaseEnv(ABC):
         if self.observation_stds is not None:
             self.Observation_noises = self.backend.normal(
                 generator=self.backend.generator(
-                    seed=self.seed,
+                    seed=self.noise_seed,
                 ),
                 shape=(self.shape_T[0], *_shape),
                 mean=0.0,
@@ -722,14 +722,14 @@ class BaseEnv(ABC):
         # get reward data from file
         if data_rewards is None:
             data_rewards = self.io.load_data(
-                file_name=file_name
+                file_name=file_name,
             )
         # get reward data from trajectories
         if data_rewards is None:
             data_rewards = self.io.get_disk_cache(
                 idx_start=_idx_s,
                 idx_end=_idx_e,
-                idxs=[-1]
+                idxs=[-1],
             )[:, -1, 0]
 
         # initialize plotter
@@ -1029,7 +1029,7 @@ class BaseGymEnv(BaseEnv, Env):
         # check if truncation required
         truncated = self.check_truncation()
         if truncated > 0:
-            print(f"Trajectory #{self.traj_idx} truncated")
+            print(f"Trajectory #{self.traj_idx} truncated after {self.t_idx} steps")
 
         # if trajectory ends
         if terminated or truncated:
@@ -1564,8 +1564,12 @@ class BaseSB3Env(BaseEnv, VecEnv):
             # reset variables
             observations = self._reset()
 
-        return observations, reward, \
-            [terminated or truncated] * self.n_envs, [{}] * self.n_envs
+        dones = self.backend.convert_to_numpy(
+            tensor=[terminated or truncated] * self.n_envs,
+            dtype='integer',
+        )
+
+        return observations, reward, dones, [{}] * self.n_envs
 
     def update_data(self):
         """Method to update the batch data for the step.

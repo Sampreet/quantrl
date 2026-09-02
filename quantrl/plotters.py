@@ -6,7 +6,7 @@
 __name__    = 'quantrl.plotters'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-12-08"
-__updated__ = "2025-08-20"
+__updated__ = "2026-09-02"
 
 # dependencies
 from io import BytesIO
@@ -271,6 +271,9 @@ class LearningCurvePlotter():
     percentiles: list, default=None
         Percentile values for intraquartile ranges.
         If ``None``, the percentiles are set to ``[25, 50, 75]``.
+    kwargs : dict
+        Other keyword arguments for figure and label and tick font properties
+        (with keys ``"label_fontdict"`` and ``"tick_fontdict"``).
     """
 
     def __init__(
@@ -278,6 +281,7 @@ class LearningCurvePlotter():
             axis_args:list,
             average_over:int=100,
             percentiles:list=None,
+            **kwargs,
     ):
         """Class constructor for LearningCurvePlotter."""
 
@@ -292,12 +296,17 @@ class LearningCurvePlotter():
         plt.ion()
 
         # initialize plot
-        self.fig = plt.figure(figsize=(6.0, 3.0))
+        figsize = kwargs.get("figsize", (6.0, 3.0))
+        label_fontdict = kwargs.get("label_fontdict", None)
+        tick_fontdict = kwargs.get("tick_fontdict", None)
+        self.fig = plt.figure(figsize=figsize)
         self.ax = plt.gca()
-        self.ax.set_xlabel(self.axis_args[0])
-        self.ax.set_ylabel(self.axis_args[1])
+        self.ax.set_xlabel(self.axis_args[0], fontdict=label_fontdict)
+        self.ax.set_ylabel(self.axis_args[1], fontdict=label_fontdict)
         self.ax.set_ylim(ymin=self.axis_args[2][0], ymax=self.axis_args[2][1])
         self.ax.set_yscale(self.axis_args[3])
+        if isinstance(tick_fontdict, dict):
+            self.ax.tick_params(labelsize=tick_fontdict.get("size", 14))
         self.fig.tight_layout()
 
         # initialze buffer
@@ -376,7 +385,7 @@ class LearningCurvePlotter():
                     q_min,
                     q_max,
                     facecolor=color,
-                    alpha=0.1,
+                    alpha=0.2,
                 )
             # calculate mean
             else:

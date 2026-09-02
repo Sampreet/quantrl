@@ -1,6 +1,6 @@
 # QuantRL: Quantum Control using Reinforcement Learning
 
-![Latest Version](https://img.shields.io/badge/version-0.0.10-red?style=for-the-badge)
+![Latest Version](https://img.shields.io/badge/version-0.1.0-red?style=for-the-badge)
 
 > A backend-agnostic library of modules to interface
 deterministic and stochastic quantum models for reinforcement learning.
@@ -17,8 +17,8 @@ with asynchronous saves.
 
 ### What's New!
 
-* Support for NumPy 2.x.x.
-* ``'tsit5'`` solver in PyTorch.
+* Support for PyTorch (GPU) with ``'tsit'`` solver.
+* Support for tuple action spaces.
 
 For a complete list of changes, see [CHANGELOG.md](CHANGELOG.md).
 
@@ -26,7 +26,7 @@ For a complete list of changes, see [CHANGELOG.md](CHANGELOG.md).
 
 [QuantRL](https://github.com/sampreet/quantrl) requires `Python 3.12+`,
 preferably installed via the
-[Anaconda distribution](https://www.anaconda.com/download).
+[MiniForge distribution](https://conda-forge.org/download/).
 It's base dependencies can be installed using:
 
 ```bash
@@ -49,11 +49,11 @@ For the CPU versions, use:
 python -m pip install torch torchdiffeq jax diffrax
 ```
 
-For the GPU versions with CUDA 12 support, use:
+For the GPU versions with CUDA 13 support, use:
 
 ```bash
 python -m pip install torch --index-url https://download.pytorch.org/whl/cu126
-python -m pip install torchdiffeq "jax[cuda12]" diffrax
+python -m pip install torchdiffeq "jax[cuda13]" diffrax
 ```
 
 ***Note: JAX-GPU support for Windows and MacOS

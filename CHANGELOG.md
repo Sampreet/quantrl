@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026/09/02 - 00 - v0.1.0 - Bump version and Minor Fixes
+* Minor fixes to `quantrl.backends.jax`, `quantrl.envs.base` and `quantrl.envs.stochastic` modules.
+* Renamed ``seed`` to ``noise_seed`` in `quantrl.envs.base` module.
+* Updated ``LearningCurvePlotter`` class in `quantrl.plotters` module.
+* Bump version in `docs/source/conf.py`, `quantrl.__init__.py`.
+* Updated `README`.
+
 ## 2026/07/16 - 00 - v0.0.11 - Add Support for Tuple Spaces
 * Added support for tuple spaces to combine discrete and continuious actions in `quantrl.envs.base` module.
 * Added option for maximum number of steps for `DiffraxIVPSolver` in `quantrl.solver.jax` module.

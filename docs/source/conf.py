@@ -22,7 +22,7 @@ copyright = '2024, Sampreet Kalita'
 author = 'Sampreet Kalita'
 
 # The full version, including alpha/beta/rc tags
-release = '0.0.10'
+release = '0.1.0'
 
 
 # -- General configuration ---------------------------------------------------

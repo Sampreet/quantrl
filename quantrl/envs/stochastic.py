@@ -6,7 +6,7 @@
 __name__    = 'quantrl.envs.stochastic'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2023-04-25"
-__updated__ = "2025-08-20"
+__updated__ = "2026-08-11"
 
 # dependencies
 import numpy as np
@@ -185,7 +185,7 @@ class LinearEnv(BaseGymEnv):
         # update Wiener noises
         self.Ws = np.sqrt(self.t_ssz) * self.backend.normal(
             generator=self.backend.generator(
-                seed=self.seed,
+                seed=self.noise_seed,
             ),
             shape=(self.shape_T[0] - 1, self.n_observations),
             mean=0.0,

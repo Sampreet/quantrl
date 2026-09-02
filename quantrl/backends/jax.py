@@ -6,7 +6,7 @@
 __name__    = 'quantrl.backends.jax'
 __authors__ = ["Sampreet Kalita"]
 __created__ = "2024-03-10"
-__updated__ = "2025-06-04"
+__updated__ = "2026-08-11"
 
 # dependencies
 from inspect import getfullargspec
@@ -65,7 +65,7 @@ class JAXBackend(BaseBackend):
 
             # get swapped axes
             _shape = jnp.shape(tensor)
-            _axes = jnp.arange(len(_shape))
+            _axes = list(range(len(_shape)))
             _axes[axis_1] = axis_0 % len(_shape)
             _axes[axis_0] = axis_1 % len(_shape)
 
